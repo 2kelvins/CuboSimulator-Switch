@@ -3,21 +3,30 @@
 #include <cmath>
 #include <cstdint>
 #include <algorithm>
+#include "laura_idle.h"
+#include "laura_voice.h"
 
-struct Sound { int remaining = 0; int total = 0; double phase = 0; };
+struct Sound {
+    const int16_t* data = nullptr;
+    int remaining = 0;
+    int position = 0;
+};
 static void audioCallback(void* userdata, Uint8* stream, int len) {
     auto* s = static_cast<Sound*>(userdata);
     auto* samples = reinterpret_cast<int16_t*>(stream);
     int count = len / sizeof(int16_t);
     for (int i = 0; i < count; ++i) {
-        int elapsed = s->total - s->remaining;
-        double progress = s->total ? double(elapsed) / s->total : 1.0;
-        double freq = 760.0 - 550.0 * progress;
-        s->phase += 2.0 * 3.141592653589793 * freq / 48000.0;
-        double wave = std::sin(s->phase) > 0 ? 1.0 : -1.0;
-        samples[i] = s->remaining > 0 ? int16_t(wave * 4500 * (1.0 - progress)) : 0;
+        samples[i] = (s->data && s->remaining > 0) ? s->data[s->position++] : 0;
         if (s->remaining > 0) --s->remaining;
     }
+}
+static void playVoice(SDL_AudioDeviceID audio, Sound& sound, const int16_t* data, int count) {
+    if (!audio) return;
+    SDL_LockAudioDevice(audio);
+    sound.data = data;
+    sound.position = 0;
+    sound.remaining = count;
+    SDL_UnlockAudioDevice(audio);
 }
 
 int main(int argc, char** argv) {
@@ -31,16 +40,22 @@ int main(int argc, char** argv) {
     if (!renderer) renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (!renderer) { SDL_DestroyWindow(window); SDL_Quit(); return 3; }
 
-    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, 110, 110, 32, SDL_PIXELFORMAT_RGBA8888);
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, LAURA_W, LAURA_H, 32, SDL_PIXELFORMAT_RGBA8888);
     if (!surface) { SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 4; }
-    SDL_FillRect(surface, nullptr, SDL_MapRGBA(surface->format, 34, 174, 245, 255));
-    SDL_Rect stripe{0, 0, 110, 18};
-    SDL_FillRect(surface, &stripe, SDL_MapRGBA(surface->format, 115, 223, 255, 255));
-    SDL_Rect mark{14, 30, 22, 22};
-    SDL_FillRect(surface, &mark, SDL_MapRGBA(surface->format, 238, 245, 255, 255));
+    SDL_LockSurface(surface);
+    auto* pixels = static_cast<Uint32*>(surface->pixels);
+    int pos = 0;
+    for (const auto& run : LAURA_PIXELS) {
+        Uint8 r = Uint8(run.rgba >> 24), g = Uint8(run.rgba >> 16);
+        Uint8 b = Uint8(run.rgba >> 8), a = Uint8(run.rgba);
+        Uint32 color = SDL_MapRGBA(surface->format, r, g, b, a);
+        for (int j=0; j<run.count; ++j) pixels[pos++] = color;
+    }
+    SDL_UnlockSurface(surface);
     SDL_Texture* cube = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_FreeSurface(surface);
     if (!cube) { SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 5; }
+    SDL_SetTextureBlendMode(cube, SDL_BLENDMODE_BLEND);
 
     Sound sound;
     SDL_AudioSpec want{};
@@ -52,7 +67,7 @@ int main(int argc, char** argv) {
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     PadState pad; padInitializeDefault(&pad);
 
-    constexpr float size = 110.0f, half = size / 2.0f;
+    constexpr float size = 70.0f, half = size / 2.0f;
     constexpr float gravity = 1500.0f, jumpSpeed = 650.0f, moveSpeed = 420.0f;
     constexpr float groundY = 620.0f;
     // Cada degrau sobe 105 px: 74,6% da altura maxima do salto (140,8 px).
@@ -65,6 +80,7 @@ int main(int argc, char** argv) {
 
     float x = 165.0f, y = groundY - half;
     float velocityY = 0.0f;
+    bool facingLeft = false;
     bool grounded = true, running = true;
     double angle = 0.0, startAngle = 0.0;
     float jumpElapsed = 0.0f;
@@ -81,22 +97,21 @@ int main(int argc, char** argv) {
         padUpdate(&pad);
         u64 down = padGetButtonsDown(&pad);
         if (down & HidNpadButton_Plus) running = false;
-        if ((down & HidNpadButton_A) && audio) {
-            SDL_LockAudioDevice(audio);
-            sound.total = sound.remaining = 48000 / 3;
-            sound.phase = 0;
-            SDL_UnlockAudioDevice(audio);
-        }
+        if (down & HidNpadButton_A)
+            playVoice(audio, sound, laura_effort, laura_effort_count);
         if ((down & HidNpadButton_B) && grounded) {
             velocityY = -jumpSpeed;
             grounded = false;
             jumpElapsed = 0.0f;
             startAngle = angle;
+            playVoice(audio, sound, laura_jump, laura_jump_count);
         }
 
         HidAnalogStickState stick = padGetStickPos(&pad, 0);
         float horizontal = stick.x / 32767.0f;
         if (std::fabs(horizontal) < 0.15f) horizontal = 0.0f;
+        if (horizontal < 0) facingLeft = true;
+        if (horizontal > 0) facingLeft = false;
 
         // Colisao horizontal com as laterais das plataformas.
         float oldX = x;
@@ -171,8 +186,8 @@ int main(int argc, char** argv) {
         SDL_Rect shadow{int(x) - 45, int(groundY) - 9, 90, 9};
         SDL_SetRenderDrawColor(renderer, 7, 9, 16, 255);
         SDL_RenderFillRect(renderer, &shadow);
-        SDL_Rect dest{int(x - half), int(y - half), int(size), int(size)};
-        SDL_RenderCopyEx(renderer, cube, nullptr, &dest, angle, nullptr, SDL_FLIP_NONE);
+        SDL_Rect dest{int(x - 31), int(y + half - 85), 62, 85};
+        SDL_RenderCopyEx(renderer, cube, nullptr, &dest, 0.0, nullptr, facingLeft ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
         SDL_RenderPresent(renderer);
     }
 
