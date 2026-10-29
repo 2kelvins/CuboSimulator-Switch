@@ -24,7 +24,7 @@ LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs \
            -L$(PORTLIBS)/lib \
            -L$(LIBNX)/lib
 
-LIBS := -lSDL2 -lnx
+LIBS := -lSDL2 -lEGL -lGLESv2 -lglapi -ldrm_nouveau -lnx
 
 .PHONY: all clean
 
