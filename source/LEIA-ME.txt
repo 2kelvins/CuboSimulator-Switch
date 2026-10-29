@@ -1,0 +1,1 @@
+Substitua main.cpp e coloque laura_idle.h e laura_voice.h na mesma pasta. Execute o workflow. jump.wav e effort.wav sao arquivos para ouvir; o audio ja esta embutido em laura_voice.h.
