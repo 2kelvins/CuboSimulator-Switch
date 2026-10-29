@@ -32,7 +32,7 @@ static void playVoice(SDL_AudioDeviceID audio, Sound& sound, const int16_t* data
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) return 1;
-    SDL_Window* window = SDL_CreateWindow("Cubo Simulator 2.0", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* window = SDL_CreateWindow("Laura Adventure 0.3", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_SHOWN);
     if (!window) { SDL_Quit(); return 2; }
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
@@ -70,11 +70,23 @@ int main(int argc, char** argv) {
     constexpr float size = 70.0f, half = size / 2.0f;
     constexpr float gravity = 1500.0f, jumpSpeed = 650.0f, moveSpeed = 420.0f;
     constexpr float groundY = 620.0f;
+    constexpr float worldWidth = 4000.0f;
+    float cameraX = 0.0f;
+    float runClock = 0.0f;
+    float horizontal = 0.0f;
     // Cada degrau sobe 105 px: 74,6% da altura maxima do salto (140,8 px).
     const SDL_Rect platforms[] = {
         {245, 515, 215, 22},
         {520, 410, 215, 22},
-        {795, 305, 215, 22}
+        {795, 305, 215, 22},
+        {1100, 410, 230, 22},
+        {1400, 515, 230, 22},
+        {1730, 410, 215, 22},
+        {2010, 305, 215, 22},
+        {2320, 410, 230, 22},
+        {2640, 515, 230, 22},
+        {2950, 410, 215, 22},
+        {3230, 305, 215, 22}
     };
     constexpr int platformCount = sizeof(platforms) / sizeof(platforms[0]);
 
@@ -108,14 +120,14 @@ int main(int argc, char** argv) {
         }
 
         HidAnalogStickState stick = padGetStickPos(&pad, 0);
-        float horizontal = stick.x / 32767.0f;
+        horizontal = stick.x / 32767.0f;
         if (std::fabs(horizontal) < 0.15f) horizontal = 0.0f;
         if (horizontal < 0) facingLeft = true;
         if (horizontal > 0) facingLeft = false;
 
         // Colisao horizontal com as laterais das plataformas.
         float oldX = x;
-        float nextX = std::max(half, std::min(1280.0f - half, x + horizontal * moveSpeed * dt));
+        float nextX = std::max(half, std::min(worldWidth - half, x + horizontal * moveSpeed * dt));
         for (int i = 0; i < platformCount; ++i) {
             const SDL_Rect& p = platforms[i];
             if (y + half > p.y && y - half < p.y + p.h) {
@@ -168,8 +180,18 @@ int main(int argc, char** argv) {
             if (grounded && !supported) { grounded = false; velocityY = 0.0f; }
         }
 
+        if (grounded && std::fabs(horizontal) > 0.0f) runClock += dt * 11.0f;
+        else runClock = 0.0f;
+        cameraX = std::max(0.0f, std::min(worldWidth - 1280.0f, x - 420.0f));
+
         SDL_SetRenderDrawColor(renderer, 17, 20, 34, 255);
         SDL_RenderClear(renderer);
+        // Linhas de fundo deslocam mais devagar (parallax simples).
+        SDL_SetRenderDrawColor(renderer, 26, 32, 51, 255);
+        for (int i = 0; i < 24; ++i) {
+            SDL_Rect pillar{int(i * 210 - cameraX * 0.35f), 170 + (i % 3) * 35, 75, 450};
+            SDL_RenderFillRect(renderer, &pillar);
+        }
         SDL_Rect floor{0, int(groundY), 1280, 100};
         SDL_SetRenderDrawColor(renderer, 44, 51, 70, 255);
         SDL_RenderFillRect(renderer, &floor);
@@ -178,16 +200,24 @@ int main(int argc, char** argv) {
         SDL_RenderFillRect(renderer, &floorLine);
         for (int i = 0; i < platformCount; ++i) {
             SDL_SetRenderDrawColor(renderer, 60, 79, 106, 255);
-            SDL_RenderFillRect(renderer, &platforms[i]);
-            SDL_Rect top{platforms[i].x, platforms[i].y, platforms[i].w, 5};
+            SDL_Rect screenPlatform = platforms[i];
+            screenPlatform.x -= int(cameraX);
+            if (screenPlatform.x + screenPlatform.w < 0 || screenPlatform.x > 1280) continue;
+            SDL_RenderFillRect(renderer, &screenPlatform);
+            SDL_Rect top{screenPlatform.x, screenPlatform.y, screenPlatform.w, 5};
             SDL_SetRenderDrawColor(renderer, 117, 213, 195, 255);
             SDL_RenderFillRect(renderer, &top);
         }
-        SDL_Rect shadow{int(x) - 45, int(groundY) - 9, 90, 9};
+        SDL_Rect shadow{int(x - cameraX) - 28, int(groundY) - 9, 56, 9};
         SDL_SetRenderDrawColor(renderer, 7, 9, 16, 255);
         SDL_RenderFillRect(renderer, &shadow);
-        SDL_Rect dest{int(x - 31), int(y + half - 85), 62, 85};
-        SDL_RenderCopyEx(renderer, cube, nullptr, &dest, 0.0, nullptr, facingLeft ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+        // Animacao provisoria de corrida: oscilacao e inclinacao do sprite idle.
+        // Os quadros desenhados individualmente serao inseridos na proxima revisao.
+        bool moving = grounded && std::fabs(horizontal) > 0.0f;
+        float bob = moving ? std::fabs(std::sin(runClock)) * 4.0f : 0.0f;
+        int spriteHeight = moving ? int(85.0f - std::fabs(std::sin(runClock)) * 3.0f) : 85;
+        SDL_Rect dest{int(x - cameraX - 31), int(y + half - spriteHeight - bob), 62, spriteHeight};
+        SDL_RenderCopyEx(renderer, cube, nullptr, &dest, moving ? (facingLeft ? -3.0 : 3.0) : 0.0, nullptr, facingLeft ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
         SDL_RenderPresent(renderer);
     }
 
