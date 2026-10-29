@@ -4,11 +4,13 @@ name: Cubo Simulator - Switch
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     container:
       image: devkitpro/devkita64:latest
 
@@ -16,8 +18,12 @@ jobs:
       - name: Baixar projeto
         uses: actions/checkout@v4
 
-      - name: Instalar SDL2
-        run: dkp-pacman -Sy --noconfirm switch-sdl2
+      - name: Verificar ambiente
+        run: |
+          echo "DEVKITPRO=$DEVKITPRO"
+          echo "PORTLIBS=$PORTLIBS"
+          ls -l /opt/devkitpro/portlibs/switch/lib/libSDL2.a
+          ls -l /opt/devkitpro/portlibs/switch/lib/libEGL.a
 
       - name: Compilar Cubo Simulator
         run: make -j2
