@@ -52,6 +52,10 @@ else
 
 DEPENDS := $(OFILES:.o=.d)
 
+%.o: %.cpp
+	@echo "Compilando $<"
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -MMD -MP -c $< -o $@
+
 $(OUTPUT).nro: $(OUTPUT).elf
 
 $(OUTPUT).elf: $(OFILES)
