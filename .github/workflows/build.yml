@@ -1,0 +1,30 @@
+
+name: Cubo Simulator - Switch
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Instalar SDL2
+        run: dkp-pacman -Sy --noconfirm switch-sdl2
+
+      - name: Compilar Cubo Simulator
+        run: make -j2
+
+      - name: Disponibilizar NRO
+        uses: actions/upload-artifact@v4
+        with:
+          name: CuboSimulator-Switch
+          path: CuboSimulator.nro
+          if-no-files-found: error
