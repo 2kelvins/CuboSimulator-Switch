@@ -1,0 +1,8 @@
+Laura Adventure 1.0.11
+- Tela inicial: Laura's Sunset Demo 02 lo-fi moderno, em loop.
+- Iniciar com A, B ou +: troca para Laura's Theme e inicia a fase.
+- Durante o jogo: + alterna pausa/despausa. Fisica, tempo, animacoes e musica congelam.
+- PAUSE aparece sobre a fase escurecida, em estilo retro pixelado.
+- A tela de titulo continua usando a arte escolhida pelo usuario.
+- O som de vitoria continua interrompendo a musica da fase.
+- BGM incluida no codigo, sem arquivo externo no Switch.

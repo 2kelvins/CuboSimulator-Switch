@@ -1,0 +1,5 @@
+Laura Adventure 1.0.10
+Tela inicial usa a arte EXATA enviada pelo usuario, embutida no executavel em RGB565 (1280x720).
+A, B ou + iniciam a fase; + nao fecha o jogo durante a fase.
+Texto APERTE START faz parte da imagem e fica estatico para preservar a arte original.
+Imagem redimensionada para tela 16:9 do Switch, mantendo todo o conteudo (leve mudanca de proporcao).

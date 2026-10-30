@@ -1,0 +1,3 @@
+Laura Adventure 1.0.9 - Tela inicial corrigida
+A, B ou + iniciam a fase. O botao + nao fecha mais o aplicativo durante a fase.
+Use HOME do Nintendo Switch para sair. Musica comeca ao iniciar a fase.
