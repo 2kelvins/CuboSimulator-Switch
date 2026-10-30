@@ -1,0 +1,5 @@
+Laura Adventure 1.0.8 - Laura's Theme Demo 03
+BGM original em loop durante a fase, volume discreto, efeitos de som independentes.
+Na conclusao da missao a BGM para para tocar a vinheta de vitoria. Reiniciar reinicia a musica.
+Fonte: source/lauras_theme.h (PCM 24 kHz, 8 bits mono, reproduzido a 48 kHz).
+Sem alteracoes na jogabilidade da 1.0.7.
