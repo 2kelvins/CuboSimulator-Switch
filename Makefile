@@ -7,7 +7,7 @@ endif
 
 include $(DEVKITPRO)/libnx/switch_rules
 
-TARGET := CuboSimulator
+TARGET := LauraAdventure
 
 CXX := $(DEVKITPRO)/devkitA64/bin/aarch64-none-elf-g++
 
