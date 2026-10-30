@@ -10,15 +10,24 @@
 #include "laura_frames.h"
 #include "level_sounds.h"
 #include "level_complete.h"
+#include "lauras_theme.h"
 
 constexpr int SW=1280, SH=720;
 constexpr float WORLD=5650.0f, GROUND=615.0f;
 struct Voice {const int16_t* data=nullptr; int len=0,pos=0; float volume=1;};
-struct Mixer { Voice voices[8]; };
+struct Mixer { Voice voices[8]; bool musicPlaying=true; int musicPos=0; float musicVolume=0.25f; };
 static void audioCallback(void* p, Uint8* stream,int len) {
  Mixer& m=*static_cast<Mixer*>(p); auto* dst=(int16_t*)stream;
  for(int i=0;i<len/2;++i){int sum=0;
   for(auto& v:m.voices) if(v.data && v.pos<v.len){sum+=int(v.data[v.pos++]*v.volume);if(v.pos==v.len)v.data=nullptr;}
+  // 24 kHz source played at 48 kHz: linear interpolation, seamless loop.
+  if(m.musicPlaying && lauras_theme_count>1){
+   int idx=(m.musicPos/2)%lauras_theme_count;
+   int next=(idx+1)%lauras_theme_count;
+   int value=(m.musicPos&1)?(int(lauras_theme_pcm[idx])+int(lauras_theme_pcm[next]))/2:int(lauras_theme_pcm[idx]);
+   sum+=int(value*256*m.musicVolume);
+   m.musicPos=(m.musicPos+1)%(lauras_theme_count*2);
+  }
   dst[i]=(int16_t)std::max(-32768,std::min(32767,sum));
  }
 }
@@ -187,7 +196,7 @@ int main(int,char**){
  float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND,dropTimer=0;
  bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;int menuChoice=0;
  Uint64 prev=SDL_GetPerformanceCounter();double freq=double(SDL_GetPerformanceFrequency());
- auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;};
+ auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}};
  while(appletMainLoop()&&running){
   Uint64 now=SDL_GetPerformanceCounter();float dt=std::min(float((now-prev)/freq),0.033f);prev=now;worldTime+=dt;
   SDL_Event ev;while(SDL_PollEvent(&ev))if(ev.type==SDL_QUIT)running=false;
@@ -269,7 +278,7 @@ int main(int,char**){
    if(water&&y+35>=618){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
    // Conclusao exige tocar a porta, com o coelho coletado e sobre o patio.
    if(collected && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=380){
-    finished=true;play(audio,mix,sfx_complete,sfx_complete_count,.85f);
+    finished=true;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=false;SDL_UnlockAudioDevice(audio);}play(audio,mix,sfx_complete,sfx_complete_count,.85f);
    }
   }
   if(fadeState==1){fade=std::min(1.f,fade+dt/.4f);if(fade>=1){reset();fadeState=2;}}
