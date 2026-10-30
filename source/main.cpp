@@ -32,7 +32,7 @@ static void playVoice(SDL_AudioDeviceID audio, Sound& sound, const int16_t* data
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) return 1;
-    SDL_Window* window = SDL_CreateWindow("Laura Adventure 0.5", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* window = SDL_CreateWindow("Laura Adventure 0.6", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_SHOWN);
     if (!window) { SDL_Quit(); return 2; }
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
@@ -86,6 +86,8 @@ int main(int argc, char** argv) {
 
     constexpr float size = 70.0f, half = size / 2.0f;
     constexpr float gravity = 1500.0f, jumpSpeed = 650.0f, moveSpeed = 420.0f;
+    constexpr float fallGravityMultiplier = 1.18f; // Acelera levemente apenas a descida
+    constexpr float maxFallSpeed = 1050.0f;
     constexpr float groundY = 620.0f;
     constexpr float worldWidth = 6100.0f;
     constexpr float fallDamageThreshold = 504.0f;
@@ -171,7 +173,7 @@ int main(int argc, char** argv) {
 
         float oldY = y;
         if (!grounded) {
-            velocityY += gravity * dt;
+            velocityY = std::min(velocityY + gravity * (velocityY > 0.0f ? fallGravityMultiplier : 1.0f) * dt, maxFallSpeed);
             y += velocityY * dt;
             peakFeetY = std::min(peakFeetY, y + half);
             jumpElapsed += dt;
@@ -271,13 +273,17 @@ int main(int argc, char** argv) {
         } else if (moving) {
             selected = 1 + int(runClock * 1.2f) % 6;
         }
+        // Corrige a margem transparente abaixo dos pes em cada PNG.
+        // Assim o contato visual com o solo permanece estavel entre as poses.
+        constexpr int bottomPadding[frameCount] = {3, 2, 4, 1, 7, 5, 2, 27, 8, 15, 11, 47, 34, 20, 24, 30, 30, 20};
         SDL_Texture* current = animation[selected];
         int frameW = frames[selected]->w, frameH = frames[selected]->h;
         // Todos os quadros ancorados pelos pes no nivel da colisao.
         float spriteHeight = 85.0f;
         float spriteWidth = spriteHeight * float(frameW) / float(frameH);
         SDL_Rect dest{int(x - cameraX - spriteWidth / 2.0f),
-            int(y + half - cameraY - spriteHeight), int(spriteWidth), int(spriteHeight)};
+            int(y + half - cameraY - spriteHeight + spriteHeight * float(bottomPadding[selected]) / float(frameH)),
+            int(spriteWidth), int(spriteHeight)};
         SDL_RenderCopyEx(renderer, current, nullptr, &dest, 0.0, nullptr,
             facingLeft ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
         SDL_RenderPresent(renderer);
