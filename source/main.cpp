@@ -5,6 +5,7 @@
 #include <algorithm>
 #include "laura_idle.h"
 #include "laura_voice.h"
+#include "laura_frames.h"
 
 struct Sound {
     const int16_t* data = nullptr;
@@ -32,7 +33,7 @@ static void playVoice(SDL_AudioDeviceID audio, Sound& sound, const int16_t* data
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) return 1;
-    SDL_Window* window = SDL_CreateWindow("Laura Adventure 0.3", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* window = SDL_CreateWindow("Laura Adventure 0.4", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_SHOWN);
     if (!window) { SDL_Quit(); return 2; }
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
@@ -57,6 +58,35 @@ int main(int argc, char** argv) {
     if (!cube) { SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 5; }
     SDL_SetTextureBlendMode(cube, SDL_BLENDMODE_BLEND);
 
+    auto loadFrame = [&](const FrameData& frame) -> SDL_Texture* {
+        SDL_Surface* s = SDL_CreateRGBSurfaceWithFormat(0, frame.w, frame.h, 32, SDL_PIXELFORMAT_RGBA8888);
+        if (!s) return nullptr;
+        SDL_LockSurface(s);
+        Uint32* px = static_cast<Uint32*>(s->pixels);
+        int pos = 0;
+        for (int i = 0; i < frame.runCount; ++i) {
+            const SpriteRun& r = frame.runs[i];
+            Uint32 color = SDL_MapRGBA(s->format, Uint8(r.rgba >> 24), Uint8(r.rgba >> 16),
+                Uint8(r.rgba >> 8), Uint8(r.rgba));
+            for (int j = 0; j < r.count; ++j) px[pos++] = color;
+        }
+        SDL_UnlockSurface(s);
+        SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
+        SDL_FreeSurface(s);
+        if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+        return t;
+    };
+    const FrameData* frames[] = {&frame_run1,&frame_run2,&frame_run3,&frame_run4,
+        &frame_run5,&frame_run6,&frame_jump_up,&frame_jump_air,&frame_land,&frame_hurt};
+    SDL_Texture* animation[10]{};
+    for (int i=0; i<10; ++i) {
+        animation[i] = loadFrame(*frames[i]);
+        if (!animation[i]) {
+            for (int j=0; j<i; ++j) SDL_DestroyTexture(animation[j]);
+            SDL_DestroyTexture(cube); SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window); SDL_Quit(); return 6;
+        }
+    }
     Sound sound;
     SDL_AudioSpec want{};
     want.freq = 48000; want.format = AUDIO_S16SYS; want.channels = 1;
@@ -70,8 +100,11 @@ int main(int argc, char** argv) {
     constexpr float size = 70.0f, half = size / 2.0f;
     constexpr float gravity = 1500.0f, jumpSpeed = 650.0f, moveSpeed = 420.0f;
     constexpr float groundY = 620.0f;
-    constexpr float worldWidth = 4000.0f;
-    float cameraX = 0.0f;
+    constexpr float worldWidth = 6100.0f;
+    constexpr float fallDamageThreshold = 504.0f;
+    float cameraX = 0.0f, cameraY = 0.0f;
+    float peakFeetY = groundY;
+    float hurtTimer = 0.0f, landTimer = 0.0f;
     float runClock = 0.0f;
     float horizontal = 0.0f;
     // Cada degrau sobe 105 px: 74,6% da altura maxima do salto (140,8 px).
@@ -86,7 +119,14 @@ int main(int argc, char** argv) {
         {2320, 410, 230, 22},
         {2640, 515, 230, 22},
         {2950, 410, 215, 22},
-        {3230, 305, 215, 22}
+        {3230, 305, 215, 22},
+        // Torre: degraus de 105px, subida acessivel e queda final perigosa.
+        {3500, 200, 215, 22},
+        {3770, 95, 215, 22},
+        {4040, -10, 215, 22},
+        {4310, -115, 215, 22},
+        {4580, -220, 215, 22},
+        {4850, -325, 215, 22}
     };
     constexpr int platformCount = sizeof(platforms) / sizeof(platforms[0]);
 
@@ -109,13 +149,14 @@ int main(int argc, char** argv) {
         padUpdate(&pad);
         u64 down = padGetButtonsDown(&pad);
         if (down & HidNpadButton_Plus) running = false;
-        if (down & HidNpadButton_A)
+        if ((down & HidNpadButton_A) && hurtTimer <= 0.0f)
             playVoice(audio, sound, laura_effort, laura_effort_count);
-        if ((down & HidNpadButton_B) && grounded) {
+        if ((down & HidNpadButton_B) && grounded && hurtTimer <= 0.0f) {
             velocityY = -jumpSpeed;
             grounded = false;
             jumpElapsed = 0.0f;
             startAngle = angle;
+            peakFeetY = y + half;
             playVoice(audio, sound, laura_jump, laura_jump_count);
         }
 
@@ -126,6 +167,8 @@ int main(int argc, char** argv) {
         if (horizontal > 0) facingLeft = false;
 
         // Colisao horizontal com as laterais das plataformas.
+        if (hurtTimer > 0.0f) { hurtTimer = std::max(0.0f, hurtTimer - dt); horizontal = 0.0f; }
+        if (landTimer > 0.0f) landTimer = std::max(0.0f, landTimer - dt);
         float oldX = x;
         float nextX = std::max(half, std::min(worldWidth - half, x + horizontal * moveSpeed * dt));
         for (int i = 0; i < platformCount; ++i) {
@@ -143,6 +186,7 @@ int main(int argc, char** argv) {
         if (!grounded) {
             velocityY += gravity * dt;
             y += velocityY * dt;
+            peakFeetY = std::min(peakFeetY, y + half);
             jumpElapsed += dt;
             angle = startAngle + 90.0 * std::min(jumpElapsed / flightTime, 1.0f);
         }
@@ -167,6 +211,14 @@ int main(int argc, char** argv) {
             landed = true;
         }
         if (landed) {
+            float fallDistance = (y + half) - peakFeetY;
+            if (!grounded && fallDistance >= fallDamageThreshold) {
+                hurtTimer = 0.50f;
+                playVoice(audio, sound, laura_effort, laura_effort_count);
+            } else if (!grounded) {
+                landTimer = 0.12f;
+            }
+            peakFeetY = y + half;
             grounded = true;
             angle = startAngle + 90.0;
         } else {
@@ -177,52 +229,73 @@ int main(int argc, char** argv) {
                 if (std::fabs((y + half) - p.y) < 0.1f &&
                     x + half > p.x && x - half < p.x + p.w) supported = true;
             }
-            if (grounded && !supported) { grounded = false; velocityY = 0.0f; }
+            if (grounded && !supported) { grounded = false; velocityY = 0.0f; peakFeetY = y + half; }
         }
 
         if (grounded && std::fabs(horizontal) > 0.0f) runClock += dt * 11.0f;
         else runClock = 0.0f;
         cameraX = std::max(0.0f, std::min(worldWidth - 1280.0f, x - 420.0f));
+        // A camera sobe na torre e volta ao nivel original ao descer.
+        float targetCameraY = std::min(0.0f, y - 350.0f);
+        cameraY += (targetCameraY - cameraY) * std::min(1.0f, dt * 7.0f);
 
         SDL_SetRenderDrawColor(renderer, 17, 20, 34, 255);
         SDL_RenderClear(renderer);
         // Linhas de fundo deslocam mais devagar (parallax simples).
         SDL_SetRenderDrawColor(renderer, 26, 32, 51, 255);
         for (int i = 0; i < 24; ++i) {
-            SDL_Rect pillar{int(i * 210 - cameraX * 0.35f), 170 + (i % 3) * 35, 75, 450};
+            SDL_Rect pillar{int(i * 210 - cameraX * 0.35f), 170 + (i % 3) * 35 - int(cameraY * 0.2f), 75, 450};
             SDL_RenderFillRect(renderer, &pillar);
         }
-        SDL_Rect floor{0, int(groundY), 1280, 100};
+        SDL_Rect floor{0, int(groundY - cameraY), 1280, 100};
         SDL_SetRenderDrawColor(renderer, 44, 51, 70, 255);
         SDL_RenderFillRect(renderer, &floor);
-        SDL_Rect floorLine{0, int(groundY), 1280, 4};
+        SDL_Rect floorLine{0, int(groundY - cameraY), 1280, 4};
         SDL_SetRenderDrawColor(renderer, 100, 116, 145, 255);
         SDL_RenderFillRect(renderer, &floorLine);
         for (int i = 0; i < platformCount; ++i) {
             SDL_SetRenderDrawColor(renderer, 60, 79, 106, 255);
             SDL_Rect screenPlatform = platforms[i];
             screenPlatform.x -= int(cameraX);
+            screenPlatform.y -= int(cameraY);
             if (screenPlatform.x + screenPlatform.w < 0 || screenPlatform.x > 1280) continue;
             SDL_RenderFillRect(renderer, &screenPlatform);
             SDL_Rect top{screenPlatform.x, screenPlatform.y, screenPlatform.w, 5};
             SDL_SetRenderDrawColor(renderer, 117, 213, 195, 255);
             SDL_RenderFillRect(renderer, &top);
         }
-        SDL_Rect shadow{int(x - cameraX) - 28, int(groundY) - 9, 56, 9};
+        SDL_Rect shadow{int(x - cameraX) - 28, int(groundY - cameraY) - 9, 56, 9};
         SDL_SetRenderDrawColor(renderer, 7, 9, 16, 255);
         SDL_RenderFillRect(renderer, &shadow);
-        // Animacao provisoria de corrida: oscilacao e inclinacao do sprite idle.
-        // Os quadros desenhados individualmente serao inseridos na proxima revisao.
+        // Corrida aprovada: sprites 1, 2, 3, 5, 6, 4.
+        const int runOrder[6] = {0, 1, 2, 4, 5, 3};
         bool moving = grounded && std::fabs(horizontal) > 0.0f;
-        float bob = moving ? std::fabs(std::sin(runClock)) * 4.0f : 0.0f;
-        int spriteHeight = moving ? int(85.0f - std::fabs(std::sin(runClock)) * 3.0f) : 85;
-        SDL_Rect dest{int(x - cameraX - 31), int(y + half - spriteHeight - bob), 62, spriteHeight};
-        SDL_RenderCopyEx(renderer, cube, nullptr, &dest, moving ? (facingLeft ? -3.0 : 3.0) : 0.0, nullptr, facingLeft ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+        SDL_Texture* current = cube;
+        int frameW = LAURA_W, frameH = LAURA_H;
+        if (hurtTimer > 0.0f) {
+            current = animation[9]; frameW = frames[9]->w; frameH = frames[9]->h;
+        } else if (!grounded) {
+            int f = velocityY < 0.0f ? 6 : 7;
+            current = animation[f]; frameW = frames[f]->w; frameH = frames[f]->h;
+        } else if (landTimer > 0.0f) {
+            current = animation[8]; frameW = frames[8]->w; frameH = frames[8]->h;
+        } else if (moving) {
+            int f = runOrder[int(runClock * 1.2f) % 6];
+            current = animation[f]; frameW = frames[f]->w; frameH = frames[f]->h;
+        }
+        // Todos os quadros ancorados pelos pes no nivel da colisao.
+        float spriteHeight = 85.0f;
+        float spriteWidth = spriteHeight * float(frameW) / float(frameH);
+        SDL_Rect dest{int(x - cameraX - spriteWidth / 2.0f),
+            int(y + half - cameraY - spriteHeight), int(spriteWidth), int(spriteHeight)};
+        SDL_RenderCopyEx(renderer, current, nullptr, &dest, 0.0, nullptr,
+            facingLeft ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
         SDL_RenderPresent(renderer);
     }
 
     if (audio) SDL_CloseAudioDevice(audio);
     SDL_DestroyTexture(cube);
+    for (auto* t : animation) SDL_DestroyTexture(t);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

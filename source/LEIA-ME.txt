@@ -1,14 +1,6 @@
-LAURA ADVENTURE 0.3 - CAMERA + CORRIDA (PROTOTIPO)
-
-Substitua main.cpp e mantenha laura_idle.h e laura_voice.h na mesma pasta.
-Nenhuma biblioteca nova: SDL2 e libnx como na versao que ja funcionou.
-
-Controles: analogico esquerdo anda, B pula, A faz esforco, + sai.
-Mundo de 4000 pixels, camera lateral, 11 plataformas, fundo com parallax.
-IMPORTANTE: a corrida e uma animacao PROVISORIA do sprite parado
-(oscilacao/inclinacao), nao sao quadros novos de pernas e bracos.
-A fisica e as colisoes continuam em coordenadas de mundo.
-As plataformas mantem os degraus de 105px, mas algumas descem
-para tornar possivel atravessar o percurso sem saltos impossiveis.
-
-Ainda precisa compilar e testar no console.
+Laura Adventure 0.4 - corrida, salto, dano por queda e torre elevada.
+Copie main.cpp, laura_idle.h, laura_voice.h e laura_frames.h para a mesma pasta do main.cpp no repositorio.
+Os PNGs sao apenas para revisao visual; o codigo usa imagens incorporadas no header.
+A ordem da corrida e 1,2,3,5,6,4. Dano ao aterrissar apos cair >=504px (medido pelos pes).
+O som de dano reutiliza temporariamente o som de esforco Type 1.
+ATENCAO: sprites foram recortados de uma folha conceitual, com possiveis artefatos; esta e uma versao de teste e nao foi compilada no Switch.
