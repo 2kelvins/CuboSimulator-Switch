@@ -1,0 +1,9 @@
+Laura Adventure 1.0.2 - rota de retorno pelos telhados
+
+- Removidas caixas suspensas e atalhos proximos ao comercio.
+- Caixa principal no chao, junto ao muro antes do primeiro corrego.
+- Adicionada sequencia de muros e telhados para voltar ate a padaria e pegar o coelho.
+- Planos de fundo estendidos ate a linha do solo para evitar construcoes flutuantes.
+- Agua, audio, fade, sprites e plataforma movel preservados.
+
+A validar no Switch: alcance de cada salto, colisao lateral e fluidez do percurso.
