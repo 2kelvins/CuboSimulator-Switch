@@ -1,5 +1,5 @@
 
-name: Cubo Simulator - Switch
+name: Laura Adventure - Nintendo Switch
 
 on:
   workflow_dispatch:
@@ -9,6 +9,7 @@ on:
 
 jobs:
   build:
+    name: Compilar Laura Adventure
     runs-on: ubuntu-latest
 
     container:
@@ -25,12 +26,23 @@ jobs:
           ls -l /opt/devkitpro/portlibs/switch/lib/libSDL2.a
           ls -l /opt/devkitpro/portlibs/switch/lib/libEGL.a
 
-      - name: Compilar Cubo Simulator
+      - name: Limpar compilacoes anteriores
+        run: make clean
+
+      - name: Compilar Laura Adventure
         run: make -j2
 
-      - name: Disponibilizar NRO
+      - name: Verificar arquivo gerado
+        run: |
+          echo "Arquivos gerados:"
+          ls -lh
+          test -s LauraAdventure.nro
+          echo "LauraAdventure.nro encontrado!"
+
+      - name: Disponibilizar Laura Adventure
         uses: actions/upload-artifact@v4
         with:
-          name: CuboSimulator-Switch
-          path: CuboSimulator.nro
+          name: LauraAdventure-Switch
+          path: LauraAdventure.nro
           if-no-files-found: error
+          compression-level: 0
