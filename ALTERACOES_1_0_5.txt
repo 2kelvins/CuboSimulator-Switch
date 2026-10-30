@@ -1,0 +1,9 @@
+Laura Adventure 1.0.5 - teste de jogabilidade
+- Menu de vitoria com REINICIAR e PROXIMO NIVEL bloqueado (cadeado). D-pad seleciona; A/B confirma reinicio.
+- Degraus da escola agora sao solidos, com colisao lateral, superior e inferior, e subida automatica de degraus de 35px.
+- Alicerce da escola e solido.
+- Jacare desenhado com focinho, olho, dentes, patas e cauda; movimenta-se e balanca na agua.
+- Primeira plataforma movel deslocada para perto da caixa entre os corregos, elevada para exigir salto a partir da caixa.
+- Duas plataformas moveis permanecem no segundo corrego.
+- Mantidos sprites, sons, coelho, objetivo, fade e demais elementos da versao anterior.
+Nao validado em hardware Nintendo Switch.
