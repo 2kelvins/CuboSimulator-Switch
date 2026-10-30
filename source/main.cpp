@@ -9,6 +9,7 @@
 #include "laura_voice.h"
 #include "laura_frames.h"
 #include "level_sounds.h"
+#include "level_complete.h"
 
 constexpr int SW=1280, SH=720;
 constexpr float WORLD=5650.0f, GROUND=615.0f;
@@ -105,12 +106,15 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  }
  // Jacare no segundo corrego
  fill(r,3720,675,172,24,65,102,43,int(cam));fill(r,3865,664,55,29,69,112,48,int(cam));fill(r,3897,673,6,5,226,220,133,int(cam));
- // Escadaria e escola
+ // Escadaria solida visualmente: degraus apoiados no terreno e colisoes no topo.
  for(int i=0;i<8;i++){float xx=4510+i*76, yy=615-i*35;fill(r,xx,yy,80,SH-yy,96,97,88,int(cam));fill(r,xx,yy,80,9,178,176,150,int(cam));}
- building(r,5050,165,600,250,113,167,113,int(cam));fill(r,5060,175,575,40,79,132,86,int(cam));
+ // A escola tem alicerce ate o solo, sem vazio embaixo.
+ fill(r,5050,370,600,SH-370,96,97,88,int(cam));
+ fill(r,5050,370,600,10,178,176,150,int(cam));
+ building(r,5050,165,600,205,113,167,113,int(cam));fill(r,5060,175,575,40,79,132,86,int(cam));
  // arco iris simplificado em faixas
  for(int i=0;i<5;i++){Uint8 cols[5][3]={{220,86,80},{230,161,70},{220,208,84},{95,175,111},{96,137,204}};fill(r,5200+i*11,190+i*8,275-i*22,8,cols[i][0],cols[i][1],cols[i][2],int(cam));}
- label(r,"ESCOLA ARCO-IRIS",5120,264,3,239,244,220,int(cam));fill(r,5270,331,112,84,35,80,69,int(cam));fill(r,5321,331,5,84,181,204,187,int(cam));
+ label(r,"ESCOLA ARCO-IRIS",5120,264,3,239,244,220,int(cam));fill(r,5270,286,112,84,35,80,69,int(cam));fill(r,5321,286,5,84,181,204,187,int(cam));
  // Caixas e superficie do muro; telhados usam a propria arte das construcoes.
  for(const auto& b:blocks){
   if(b.w==64&&b.h==64)crate(r,b.x,b.y,int(cam));
@@ -120,7 +124,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
 }
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.3",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.4",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
@@ -141,12 +145,15 @@ int main(int,char**){
  std::vector<Rect> oneWay={
   {0,295,460,16}, {460,295,585,16}, // comercio
   {1270,277,320,12}, {1680,335,430,12}, // telhados das casas
-  {2110,425,210,12} // topo do muro de separacao
+  {2110,425,210,12}, // topo do muro de separacao
+  {5050,370,600,12} // patio da escola, no nivel do ultimo degrau
  };
  std::vector<Rect> solid={
   {1995,GROUND-64,64,64}, // caixa de acesso, no chao
   {2790,GROUND-64,64,64}  // caixa entre os corregos
  };
+ // Degraus: topo atravessavel por baixo e pisavel por cima, sem bloquear lateralmente.
+ for(int i=0;i<8;i++)oneWay.push_back({4510.f+i*76.f,615.f-i*35.f,80.f,12.f});
  const Rect barrier{2110,437,210,178};
  // A grade em frente a casa continua decorativa e nao recebe colisao.
  std::array<Rect,3> movers{{{3320,520,145,22},{3710,465,145,22},{4130,510,145,22}}};
@@ -207,7 +214,10 @@ int main(int,char**){
    // Agua causa falha, jacare apenas visual
    bool water=((x>=2320&&x<2660)||(x>=3170&&x<4510));
    if(water&&y+35>=618){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
-   if(x>5270&&x<5400&&y+35<=425&&collected){finished=true;play(audio,mix,sfx_healed1,sfx_healed1_count,.8f);}
+   // Conclusao exige tocar a porta, com o coelho coletado e sobre o patio.
+   if(collected && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=376){
+    finished=true;play(audio,mix,sfx_complete,sfx_complete_count,.85f);
+   }
   }
   if(fadeState==1){fade=std::min(1.f,fade+dt/.4f);if(fade>=1){reset();fadeState=2;}}
   else if(fadeState==2){fade=std::max(0.f,fade-dt/.4f);if(fade<=0)fadeState=0;}
@@ -215,7 +225,7 @@ int main(int,char**){
   cam+=((std::max(0.f,std::min(WORLD-SW,x-410)))-cam)*std::min(1.f,dt*6);
   scene(r,cam,worldTime,solid,movers,collected);
   // Indicador de objetivo (sem dependencia de fonte)
-  fill(r,18,18,375,42,32,57,65);label(r,collected?"COELHO OK":"PEGUE O COELHO",35,28,3,250,240,214,0);
+  fill(r,18,18,375,42,32,57,65);label(r,collected?"VA PARA A ESCOLA":"PEGUE O COELHO",35,28,3,250,240,214,0);
   int selected=0;
   if(hurtTimer>0)selected=15+std::min(2,int((.54f-hurtTimer)/.18f));
   else if(!grounded){if(jumpElapsed<.09f)selected=7;else if(vy<-90)selected=8;else if(vy<90)selected=9;else selected=10;}
@@ -228,7 +238,7 @@ int main(int,char**){
   if(selected==15)SDL_SetTextureColorMod(anim[selected],255,174,174);
   SDL_RenderCopyEx(r,anim[selected],nullptr,&dest,0,nullptr,facingLeft?SDL_FLIP_HORIZONTAL:SDL_FLIP_NONE);
   if(selected==15)SDL_SetTextureColorMod(anim[selected],255,255,255);
-  if(finished){fill(r,360,270,570,145,31,84,73);label(r,"ESCOLA ARCO-IRIS",401,309,4,250,233,180,0);}
+  if(finished){fill(r,310,255,660,175,31,84,73);label(r,"MISSAO CONCLUIDA",349,289,5,250,233,180,0);label(r,"LAURA CHEGOU A ESCOLA",375,365,3,250,233,180,0);}
   if(fade>0){SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));SDL_Rect full{0,0,SW,SH};SDL_RenderFillRect(r,&full);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);}
   SDL_RenderPresent(r);
  }
