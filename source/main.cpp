@@ -152,9 +152,11 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  for(auto& p:moving){fill(r,p.x,p.y,p.w,p.h,82,125,152,int(cam));fill(r,p.x,p.y,p.w,6,139,200,213,int(cam));fill(r,p.x+8,p.y+10,p.w-16,5,48,82,98,int(cam));}
  if(!collected)rabbit(r,780,240,int(cam));
 }
+#include "level2.h"
+
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.10",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.1 - Fase 2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
@@ -167,6 +169,26 @@ int main(int,char**){
  };
  const FrameData* frames[]={&frame_parado_001,&frame_corrida_001,&frame_corrida_002,&frame_corrida_003,&frame_corrida_004,&frame_corrida_005,&frame_corrida_006,&frame_salto_001,&frame_salto_002,&frame_salto_003,&frame_salto_004,&frame_aterrissagem_001,&frame_aterrissagem_002,&frame_aterrissagem_003,&frame_aterrissagem_004,&frame_dano_001,&frame_dano_002,&frame_dano_003};
  SDL_Texture* anim[18]{};for(int i=0;i<18;i++){anim[i]=loadFrame(*frames[i]);if(!anim[i]){SDL_Quit();return 4;}}
+ // Carregar somente os 6 PNGs integrados em mamae_frames.h (sem arquivos externos).
+ auto loadMamae=[&](const MamaeFrame& frame)->SDL_Texture*{
+  SDL_Surface* surface=SDL_CreateRGBSurfaceWithFormat(0,frame.w,frame.h,32,SDL_PIXELFORMAT_RGBA8888);
+  if(!surface)return nullptr;
+  SDL_LockSurface(surface);
+  Uint32* pixels=(Uint32*)surface->pixels;int pos=0;
+  for(int k=0;k<frame.runCount;k++){
+   const MamaeRun& run=frame.runs[k];
+   Uint32 color=SDL_MapRGBA(surface->format,Uint8(run.rgba>>24),Uint8(run.rgba>>16),Uint8(run.rgba>>8),Uint8(run.rgba));
+   for(uint32_t j=0;j<run.count;j++)pixels[pos++]=color;
+  }
+  SDL_UnlockSurface(surface);
+  SDL_Texture* t=SDL_CreateTextureFromSurface(r,surface);SDL_FreeSurface(surface);
+  if(t)SDL_SetTextureBlendMode(t,SDL_BLENDMODE_BLEND);
+  return t;
+ };
+ const MamaeFrame* momFrames[]={&mamae_esperando_001,&mamae_esperando_002,&mamae_interacao_001,&mamae_interacao_002,&mamae_balao_exclamacao,&mamae_balao_coracao};
+ SDL_Texture* mom[6]{};for(int i=0;i<6;i++)mom[i]=loadMamae(*momFrames[i]);
+ Level2 level2;
+ bool stage2=false;
  SDL_Texture* titleTexture=SDL_CreateTexture(r,SDL_PIXELFORMAT_RGB565,SDL_TEXTUREACCESS_STATIC,title_art_width,title_art_height);
  if(titleTexture){
   SDL_UpdateTexture(titleTexture,nullptr,title_art_rgb565,title_art_width*int(sizeof(uint16_t)));
@@ -215,9 +237,10 @@ int main(int,char**){
   padUpdate(&pad);u64 down=padGetButtonsDown(&pad);
   if(titleScreen){
    titleTime+=dt;
-   if(down&(HidNpadButton_A|HidNpadButton_B|HidNpadButton_Plus)){
-    titleScreen=false;reset();
-    down=0; // Nao reutilizar Start como comando de sair no mesmo quadro.
+   if(down&(HidNpadButton_A|HidNpadButton_B|HidNpadButton_Plus|HidNpadButton_X)){
+    titleScreen=false;stage2=(down&HidNpadButton_X)!=0;
+    reset();if(stage2)level2.reset();
+    down=0; // Nao reutilizar Start como comando no mesmo quadro.
    }
    // Arte original enviada pelo usuario: exibida integralmente.
    SDL_SetRenderDrawColor(r,0,0,0,255);SDL_RenderClear(r);
@@ -230,16 +253,46 @@ int main(int,char**){
   // + alterna pause e jogo, inclusive apos concluir a fase.
   if(down&HidNpadButton_Plus){
    paused=!paused;
-   if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=!paused&&!finished;SDL_UnlockAudioDevice(audio);}
+   if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=!paused && (stage2 ? !level2.finished : !finished);SDL_UnlockAudioDevice(audio);}
+  }
+  // A segunda fase tem camera vertical, mapa, colisao e HUD independentes.
+  // X na tela inicial abre diretamente a fase 2 para testes da branch.
+  if(stage2){
+   if(!paused){
+    if(level2.finished&&(down&HidNpadButton_X)){
+     level2.reset();
+     if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicTrack=1;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}
+    }else{
+     HidAnalogStickState s2Stick=padGetStickPos(&pad,0);
+     float axis=float(s2Stick.x)/32767.f;
+     level2.update(dt,down,axis,audio,mix);
+    }
+   }
+   level2.render(r,mom,anim,frames);
+   if(paused){
+    SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,8,16,32,160);
+    SDL_Rect veil{0,0,SW,SH};SDL_RenderFillRect(r,&veil);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
+    fill(r,395,270,490,170,25,52,78);fill(r,404,279,472,152,54,95,115);
+    label(r,"PAUSE",475,320,11,255,238,178,0);
+    label(r,"START PARA VOLTAR",467,402,2,245,236,216,0);
+   }
+   SDL_RenderPresent(r);
+   continue;
   }
   float h=0;
   if(!paused){
   HidAnalogStickState stick=padGetStickPos(&pad,0);h=float(stick.x)/32767.f;if(std::fabs(h)<.15f)h=0;
   if(h<0)facingLeft=true;else if(h>0)facingLeft=false;
   if(finished){
-   // Proximo nivel bloqueado: somente REINICIAR e acionavel.
+   // Menu de conclusao da fase 1: REINICIAR ou PROXIMO NIVEL.
    if(down&(HidNpadButton_Down|HidNpadButton_Up))menuChoice=1-menuChoice;
-   if((down&(HidNpadButton_A|HidNpadButton_B))&&menuChoice==0)reset();
+   if(down&(HidNpadButton_A|HidNpadButton_B)){
+    if(menuChoice==0)reset();
+    else{
+     stage2=true;level2.reset();
+     if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicTrack=1;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}
+    }
+   }
   }
   for(int i=0;i<3;i++){float origins[3]={2880,3540,4110};float ranges[3]={22,135,115};float speeds[3]={.85f,.95f,1.25f};movers[i].x=origins[i]+ranges[i]*std::sin(worldTime*speeds[i]+i);}
   if(fadeState==0&&!finished){
@@ -342,9 +395,8 @@ int main(int,char**){
    fill(r,345,367,590,48,menuChoice==0?229:70,menuChoice==0?196:113,menuChoice==0?114:102);
    label(r,"REINICIAR",474,377,4,menuChoice==0?36:217,menuChoice==0?67:230,menuChoice==0?59:209,0);
    fill(r,345,430,590,48,menuChoice==1?105:67,menuChoice==1?117:92,menuChoice==1?109:86);
-   label(r,"PROXIMO NIVEL",405,441,3,171,178,170,0);
-   // Cadeado pixelado para o nivel que ainda nao existe.
-   fill(r,827,440,20,23,190,194,181);fill(r,832,432,10,11,190,194,181);fill(r,836,448,3,8,68,83,72);
+   label(r,"PROXIMO NIVEL",405,441,3,menuChoice==1?251:182,menuChoice==1?239:193,menuChoice==1?183:167,0);
+   // Fase 2 agora selecionavel; nao mostrar cadeado.
   }
   if(fade>0){SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));SDL_Rect full{0,0,SW,SH};SDL_RenderFillRect(r,&full);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);}
   if(paused){
@@ -359,5 +411,5 @@ int main(int,char**){
   }
   SDL_RenderPresent(r);
  }
- if(audio)SDL_CloseAudioDevice(audio);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
+ if(audio)SDL_CloseAudioDevice(audio);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
 }

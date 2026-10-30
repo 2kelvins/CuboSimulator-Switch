@@ -1,0 +1,40 @@
+LAURA ADVENTURE - FASE 2 / PRIMEIRO PROTOTIPO JOGAVEL
+Branch recomendada: fase-2. Nao mesclar na main antes do teste no Switch.
+
+COMO TESTAR
+- Abra o jogo normalmente: A, B ou + inicia a Fase 1 (preservada).
+- Atalho APENAS PARA TESTES nesta branch: aperte X na tela inicial para abrir diretamente a Fase 2.
+- Quando concluir a Fase 1, escolha PROXIMO NIVEL com a seta e confirme com A/B.
+- Analógico esquerdo: mover. B: pular. A: atravessar plataformas de mao unica para baixo.
+- +: pausar/despausar. HOME: voltar ao menu do Switch.
+- Y: conversar com a Mamae Dentista, perto da porta e com a capivara coletada.
+- X: reiniciar Fase 2 depois da conclusao.
+
+PERCURSO DA FASE 2
+1. Inicio em frente ao condominio. Buraco no solo (cair = som e fade preto).
+2. Grade impede a passagem. Suba na caixa e volte por cima dos muros.
+3. Volte ate o telhado do condominio.
+4. Suba nas nuvens estaticas, desca um pouco e pegue a nuvem movel.
+5. Atravesse o ceu sobre a agua (cair = reinicio com fade).
+6. Chegue a arvore gigante; pule atraves dos galhos e pouse por cima.
+7. Suba pelas nuvens ate a copa e COLETE A CAPIVARINHA DE PELUCIA.
+8. Desca pelas nuvens em escada, usando A para atravessar por baixo.
+9. Desca pelos toldos da AUTO-ESCOLA PANTANAL.
+10. Volte pelo solo e suba a escadaria do consultorio. Pressione Y na Mamae.
+11. Sprite de surpresa + balao !, sprite com piscadinha + coracao,
+    volta ao idle; toca a mesma vinheta de vitoria da Fase 1.
+
+STATUS DA VERSAO
+- Fase 2 e um PROTOTIPO jogavel: arte procedural simplificada; ainda precisa
+  da direcao de arte final, refinamento do cenario e validacao dos saltos reais.
+- Todos os PNGs fornecidos da Mamae estao preservados e embutidos no jogo.
+- Enquanto nao criamos a BGM propria, a fase usa Laura's Theme temporariamente.
+- Nenhuma compilacao real no Nintendo Switch foi executada pelo assistente.
+- Foi feita verificacao de sintaxe C++ em ambiente com headers SDL/libnx de teste
+  e simulacao de fisica em PC; a integracao real deve ser validada pelo workflow.
+
+ESTRUTURA
+source/main.cpp  : Fase 1 preservada, transicao para a Fase 2, selecao de nivel e pausa.
+source/level2.h  : novo mapa, camera X/Y, colisao, nuvens, arvore, coleta e interacao.
+source/mamae_frames.h : sprites originais embutidos, ja provenientes do projeto.
+.github/workflows/build.yml : habilitado para compilacao da branch fase-2.
