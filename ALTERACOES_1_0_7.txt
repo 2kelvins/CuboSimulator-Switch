@@ -1,0 +1,8 @@
+Laura Adventure 1.0.7 - Rota superior de retorno
+
+- Duas plataformas altas acima do primeiro corrego: x=2470/y=315 e x=2660/y=420.
+- Acesso previsto pela caixa da margem direita; retorno para a esquerda ate o muro.
+- Colisao unilateral direcional: os apoios de retorno nao sustentam quem tenta avanca-los da esquerda para a direita.
+- Botao A continua permitindo descer das plataformas.
+- Plataforma adicional a direita mantida em x=3195/y=411.
+- Compilacao e jogabilidade no Switch ainda nao testadas.

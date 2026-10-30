@@ -1,0 +1,5 @@
+Laura Adventure 1.0.6 - plataformas de retorno
+- Duas plataformas de apoio a esquerda da plataforma junto a caixa, permitindo voltar ao muro e telhados.
+- Uma plataforma elevada a direita para facilitar a transicao ao segundo corrego.
+- Colisao de mao unica, suporte no pouso e descida pelo botao A.
+- Mantidos caixa, jacare, escola, audio e demais recursos.
