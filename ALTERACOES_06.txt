@@ -1,0 +1,5 @@
+Laura Adventure 0.6
+- Alinhamento visual dos pes pela borda inferior dos pixels visiveis de cada sprite (sem editar os PNGs).
+- Gravidade 18% maior apenas durante a descida, velocidade terminal 1050 px/s.
+- Salto, colisao, audio e demais animacoes preservados.
+- Build ainda nao validado em devkitPro/Switch.
