@@ -3,7 +3,6 @@
 #include <cmath>
 #include <cstdint>
 #include <algorithm>
-#include "laura_idle.h"
 #include "laura_voice.h"
 #include "laura_frames.h"
 
@@ -33,30 +32,13 @@ static void playVoice(SDL_AudioDeviceID audio, Sound& sound, const int16_t* data
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) return 1;
-    SDL_Window* window = SDL_CreateWindow("Laura Adventure 0.4", SDL_WINDOWPOS_CENTERED,
+    SDL_Window* window = SDL_CreateWindow("Laura Adventure 0.5", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_SHOWN);
     if (!window) { SDL_Quit(); return 2; }
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1,
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (!renderer) { SDL_DestroyWindow(window); SDL_Quit(); return 3; }
-
-    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, LAURA_W, LAURA_H, 32, SDL_PIXELFORMAT_RGBA8888);
-    if (!surface) { SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 4; }
-    SDL_LockSurface(surface);
-    auto* pixels = static_cast<Uint32*>(surface->pixels);
-    int pos = 0;
-    for (const auto& run : LAURA_PIXELS) {
-        Uint8 r = Uint8(run.rgba >> 24), g = Uint8(run.rgba >> 16);
-        Uint8 b = Uint8(run.rgba >> 8), a = Uint8(run.rgba);
-        Uint32 color = SDL_MapRGBA(surface->format, r, g, b, a);
-        for (int j=0; j<run.count; ++j) pixels[pos++] = color;
-    }
-    SDL_UnlockSurface(surface);
-    SDL_Texture* cube = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_FreeSurface(surface);
-    if (!cube) { SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 5; }
-    SDL_SetTextureBlendMode(cube, SDL_BLENDMODE_BLEND);
 
     auto loadFrame = [&](const FrameData& frame) -> SDL_Texture* {
         SDL_Surface* s = SDL_CreateRGBSurfaceWithFormat(0, frame.w, frame.h, 32, SDL_PIXELFORMAT_RGBA8888);
@@ -76,15 +58,20 @@ int main(int argc, char** argv) {
         if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
         return t;
     };
-    const FrameData* frames[] = {&frame_run1,&frame_run2,&frame_run3,&frame_run4,
-        &frame_run5,&frame_run6,&frame_jump_up,&frame_jump_air,&frame_land,&frame_hurt};
-    SDL_Texture* animation[10]{};
-    for (int i=0; i<10; ++i) {
+    const FrameData* frames[] = {
+        &frame_parado_001, &frame_corrida_001, &frame_corrida_002, &frame_corrida_003,
+        &frame_corrida_004, &frame_corrida_005, &frame_corrida_006, &frame_salto_001,
+        &frame_salto_002, &frame_salto_003, &frame_salto_004, &frame_aterrissagem_001,
+        &frame_aterrissagem_002, &frame_aterrissagem_003, &frame_aterrissagem_004, &frame_dano_001,
+        &frame_dano_002, &frame_dano_003
+    };
+    constexpr int frameCount = sizeof(frames) / sizeof(frames[0]);
+    SDL_Texture* animation[frameCount]{};
+    for (int i=0; i<frameCount; ++i) {
         animation[i] = loadFrame(*frames[i]);
         if (!animation[i]) {
             for (int j=0; j<i; ++j) SDL_DestroyTexture(animation[j]);
-            SDL_DestroyTexture(cube); SDL_DestroyRenderer(renderer);
-            SDL_DestroyWindow(window); SDL_Quit(); return 6;
+            SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit(); return 6;
         }
     }
     Sound sound;
@@ -213,10 +200,10 @@ int main(int argc, char** argv) {
         if (landed) {
             float fallDistance = (y + half) - peakFeetY;
             if (!grounded && fallDistance >= fallDamageThreshold) {
-                hurtTimer = 0.50f;
+                hurtTimer = 0.54f;
                 playVoice(audio, sound, laura_effort, laura_effort_count);
             } else if (!grounded) {
-                landTimer = 0.12f;
+                landTimer = 0.24f;
             }
             peakFeetY = y + half;
             grounded = true;
@@ -267,22 +254,25 @@ int main(int argc, char** argv) {
         SDL_Rect shadow{int(x - cameraX) - 28, int(groundY - cameraY) - 9, 56, 9};
         SDL_SetRenderDrawColor(renderer, 7, 9, 16, 255);
         SDL_RenderFillRect(renderer, &shadow);
-        // Corrida aprovada: sprites 1, 2, 3, 5, 6, 4.
-        const int runOrder[6] = {0, 1, 2, 4, 5, 3};
+        // Frames ordenados exatamente pelos nomes enviados:
+        // parado 0; corrida 1..6; salto 7..10; aterrissagem 11..14; dano 15..17.
         bool moving = grounded && std::fabs(horizontal) > 0.0f;
-        SDL_Texture* current = cube;
-        int frameW = LAURA_W, frameH = LAURA_H;
+        int selected = 0;
         if (hurtTimer > 0.0f) {
-            current = animation[9]; frameW = frames[9]->w; frameH = frames[9]->h;
+            selected = 15 + std::min(2, int((0.54f - hurtTimer) / 0.18f));
         } else if (!grounded) {
-            int f = velocityY < 0.0f ? 6 : 7;
-            current = animation[f]; frameW = frames[f]->w; frameH = frames[f]->h;
+            // Salto: preparacao, subida, apice e descida.
+            if (jumpElapsed < 0.09f) selected = 7;
+            else if (velocityY < -90.0f) selected = 8;
+            else if (velocityY < 90.0f) selected = 9;
+            else selected = 10;
         } else if (landTimer > 0.0f) {
-            current = animation[8]; frameW = frames[8]->w; frameH = frames[8]->h;
+            selected = 11 + std::min(3, int((0.24f - landTimer) / 0.06f));
         } else if (moving) {
-            int f = runOrder[int(runClock * 1.2f) % 6];
-            current = animation[f]; frameW = frames[f]->w; frameH = frames[f]->h;
+            selected = 1 + int(runClock * 1.2f) % 6;
         }
+        SDL_Texture* current = animation[selected];
+        int frameW = frames[selected]->w, frameH = frames[selected]->h;
         // Todos os quadros ancorados pelos pes no nivel da colisao.
         float spriteHeight = 85.0f;
         float spriteWidth = spriteHeight * float(frameW) / float(frameH);
@@ -294,7 +284,6 @@ int main(int argc, char** argv) {
     }
 
     if (audio) SDL_CloseAudioDevice(audio);
-    SDL_DestroyTexture(cube);
     for (auto* t : animation) SDL_DestroyTexture(t);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
