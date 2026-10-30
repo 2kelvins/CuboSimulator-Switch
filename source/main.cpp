@@ -67,7 +67,7 @@ static void rabbit(SDL_Renderer*r,float x,float y,int cam){
  fill(r,x+8,y+28,32,29,245,241,235,cam);fill(r,x+13,y+55,26,8,242,237,233,cam);
  fill(r,x+29,y+39,4,4,35,36,44,cam);fill(r,x+38,y+47,5,4,239,131,163,cam);
 }
-static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& blocks,const std::array<Rect,3>& moving,bool collected){
+static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& blocks,const std::array<Rect,3>& moving,const std::vector<Rect>& returnPlatforms,bool collected){
  fill(r,0,0,SW,SH,127,195,231);
  // Parallax distante: morros e predios (0.14x)
  for(int i=0;i<22;i++){int px=i*210-int(cam*.14f);fill(r,px,235+(i%4)*16,190,GROUND-(235+(i%4)*16),94,157,156);fill(r,px+65,170+(i%3)*35,75,GROUND-(170+(i%3)*35),171,180,170);}
@@ -133,6 +133,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  for(const auto& b:blocks){
   if(b.w==64&&b.h==64)crate(r,b.x,b.y,int(cam));
  }
+ for(const auto& p:returnPlatforms){fill(r,p.x,p.y,p.w,p.h,111,132,145,int(cam));fill(r,p.x,p.y,p.w,6,176,207,207,int(cam));fill(r,p.x+9,p.y+10,p.w-18,4,64,93,109,int(cam));}
  for(auto& p:moving){fill(r,p.x,p.y,p.w,p.h,82,125,152,int(cam));fill(r,p.x,p.y,p.w,6,139,200,213,int(cam));fill(r,p.x+8,p.y+10,p.w-16,5,48,82,98,int(cam));}
  if(!collected)rabbit(r,780,240,int(cam));
 }
@@ -161,6 +162,15 @@ int main(int,char**){
   {1270,277,320,12}, {1680,335,430,12}, // telhados das casas
   {2110,425,210,12}, // topo do muro de separacao
   {5050,370,600,12} // patio da escola, no nivel do ultimo degrau
+ };
+ // Rota de retorno alta: somente acessivel a partir da margem direita.
+ // O salto sobre o primeiro corrego continua obrigatorio na ida.
+ // Duas plataformas elevadas permitem voltar ao muro e aos telhados.
+ // A plataforma extra a direita facilita o avanco para o segundo corrego.
+ std::vector<Rect> returnPlatforms={
+  {2470,315,140,20}, // retorno alto: descer no muro usando A
+  {2660,420,140,20}, // acesso pela caixa na margem direita
+  {3195,411,145,20}  // apoio rumo ao segundo corrego
  };
  std::vector<Rect> solid={
   {1995,GROUND-64,64,64}, // caixa de acesso, no chao
@@ -195,6 +205,7 @@ int main(int,char**){
    if((down&HidNpadButton_A)&&grounded){
     bool onOneWay=false;
     for(const auto& p:oneWay)if(std::fabs(y+35-p.y)<3&&x+26>p.x&&x-26<p.x+p.w)onOneWay=true;
+    for(const auto& p:returnPlatforms)if(std::fabs(y+35-p.y)<3&&x+26>p.x&&x-26<p.x+p.w)onOneWay=true;
     for(const auto& p:movers)if(std::fabs(y+35-p.y)<3&&x+26>p.x&&x-26<p.x+p.w)onOneWay=true;
     if(onOneWay){dropTimer=.30f;grounded=false;vy=110;y+=9;landTimer=0;play(audio,mix,laura_effort,laura_effort_count,.35f);}
    }
@@ -224,6 +235,14 @@ int main(int,char**){
    for(const auto&p:solid)landing(p,false,-1);
    for(const auto&p:stairs)landing(p,false,-1);
    landing(schoolBase,false,-1);
+   if(dropTimer<=0)for(size_t pi=0;pi<returnPlatforms.size();++pi){
+    const auto& p=returnPlatforms[pi];
+    // Os dois apoios de retorno nao capturam saltos de quem avanca
+    // da esquerda para a direita. Assim nao viram atalho sobre a agua.
+    if(pi<2 && (h>=0 || oldX<=p.x))continue;
+    if(x+26>p.x&&x-26<p.x+p.w&&vy>=0&&oldY+35<=p.y+5&&y+35>=p.y)
+     if(!landed||p.y<landedY){landed=true;landedY=p.y;onMoving=false;}
+   }
    if(dropTimer<=0)for(const auto&p:oneWay){
     if(x+26>p.x&&x-26<p.x+p.w&&vy>=0&&oldY+35<=p.y+5&&y+35>=p.y)
      if(!landed||p.y<landedY){landed=true;landedY=p.y;onMoving=false;}
@@ -239,6 +258,7 @@ int main(int,char**){
     for(const auto&p:solid)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
     for(const auto&p:stairs)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
     if(std::fabs(y+35-schoolBase.y)<2&&x+26>schoolBase.x&&x-26<schoolBase.x+schoolBase.w)supported=true;
+    if(dropTimer<=0)for(const auto&p:returnPlatforms)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
     if(dropTimer<=0)for(const auto&p:oneWay)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
     for(int i=0;i<3;i++)if(dropTimer<=0&&std::fabs(y+35-movers[i].y)<2&&x+26>movers[i].x&&x-26<movers[i].x+movers[i].w){supported=true;float speed[3]={.85f,.95f,1.25f};float range[3]={22,135,115};x+=range[i]*speed[i]*std::cos(worldTime*speed[i]+i)*dt;}
     if(grounded&&!supported){grounded=false;vy=0;jumpElapsed=.2f;peakFeet=y+35;}
@@ -256,7 +276,7 @@ int main(int,char**){
   else if(fadeState==2){fade=std::max(0.f,fade-dt/.4f);if(fade<=0)fadeState=0;}
   if(grounded&&std::fabs(h)>.1f)runClock+=dt*12;else runClock=0;
   cam+=((std::max(0.f,std::min(WORLD-SW,x-410)))-cam)*std::min(1.f,dt*6);
-  scene(r,cam,worldTime,solid,movers,collected);
+  scene(r,cam,worldTime,solid,movers,returnPlatforms,collected);
   // Indicador de objetivo (sem dependencia de fonte)
   fill(r,18,18,375,42,32,57,65);label(r,collected?"VA PARA A ESCOLA":"PEGUE O COELHO",35,28,3,250,240,214,0);
   int selected=0;
