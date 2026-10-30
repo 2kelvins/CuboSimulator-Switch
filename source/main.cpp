@@ -89,6 +89,10 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  // Rua e muros de casas
  building(r,1270,277,320,338,180,157,133,int(cam));building(r,1680,335,430,280,191,166,137,int(cam));
  fill(r,1490,427,590,188,146,137,120,int(cam));for(int i=0;i<16;i++)fill(r,1495+i*36,438+(i%3)*11,24,3,117,108,96,int(cam));
+ // Muro de separacao: chega ate o solo e bloqueia acesso lateral ao corrego.
+ fill(r,2110,430,210,185,140,132,113,int(cam));
+ fill(r,2110,425,210,12,187,174,147,int(cam));
+ for(int i=0;i<5;i++)fill(r,2120+i*40,470+(i%2)*24,26,4,111,105,91,int(cam));
  // grade: vazada, NAO e solida
  for(int i=0;i<9;i++)fill(r,1445+i*16,435,5,180,63,69,68,int(cam));
  fill(r,1440,435,152,9,55,61,59,int(cam));
@@ -107,19 +111,16 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  // arco iris simplificado em faixas
  for(int i=0;i<5;i++){Uint8 cols[5][3]={{220,86,80},{230,161,70},{220,208,84},{95,175,111},{96,137,204}};fill(r,5200+i*11,190+i*8,275-i*22,8,cols[i][0],cols[i][1],cols[i][2],int(cam));}
  label(r,"ESCOLA ARCO-IRIS",5120,264,3,239,244,220,int(cam));fill(r,5270,331,112,84,35,80,69,int(cam));fill(r,5321,331,5,84,181,204,187,int(cam));
- // Plataformas, muros, telhados e caixas com colisoes reais
+ // Caixas e superficie do muro; telhados usam a propria arte das construcoes.
  for(const auto& b:blocks){
-  if(b.x<0 || b.x>WORLD)continue;
-  if(b.h<20){fill(r,b.x,b.y,b.w,b.h,125,74,56,int(cam));fill(r,b.x,b.y,b.w,5,189,109,72,int(cam));}
-  else if(b.w==64&&b.h==64)crate(r,b.x,b.y,int(cam));
-  else {fill(r,b.x,b.y,b.w,b.h,117,114,101,int(cam));fill(r,b.x,b.y,b.w,9,179,172,148,int(cam));}
+  if(b.w==64&&b.h==64)crate(r,b.x,b.y,int(cam));
  }
  for(auto& p:moving){fill(r,p.x,p.y,p.w,p.h,82,125,152,int(cam));fill(r,p.x,p.y,p.w,6,139,200,213,int(cam));fill(r,p.x+8,p.y+10,p.w-16,5,48,82,98,int(cam));}
  if(!collected)rabbit(r,780,240,int(cam));
 }
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.3",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
@@ -135,27 +136,24 @@ int main(int,char**){
  Mixer mix{};SDL_AudioSpec want{};want.freq=48000;want.format=AUDIO_S16SYS;want.channels=1;want.samples=1024;want.callback=audioCallback;want.userdata=&mix;
  SDL_AudioDeviceID audio=SDL_OpenAudioDevice(nullptr,0,&want,nullptr,0);if(audio)SDL_PauseAudioDevice(audio,0);
  padConfigureInput(1,HidNpadStyleSet_NpadStandard);PadState pad;padInitializeDefault(&pad);
- // Rota de ida e volta: primeiro alcancar a caixa junto ao muro do corrego,
- // subir a escadinha de muros e regressar pela parte alta ate a padaria.
- // Os telhados do comercio nao podem ser alcancados diretamente do chao.
- std::vector<Rect> solid={
-  {0,295,460,16},{460,295,585,16}, // telhados mercado e padaria
-  {1995,GROUND-64,64,64},           // unica caixa de subida, encostada no primeiro muro
-  {1980,470,135,18},                // primeiro patamar (145px acima do chao)
-  {1830,395,190,18},                // muro intermediario
-  {1670,325,220,18},                // telhado da casa
-  {1500,350,200,18},                // muro alto que permite voltar para esquerda
-  {1330,345,185,18},                // caminho sobre o muro, sem usar a grade
-  {1175,335,170,18},                // passarela de retorno
-  {1015,295,180,18},                // conexao ao telhado da padaria
-  {2790,GROUND-64,64,64}            // caixa apoiada no solo entre os corregos
+ // Superficies de mao unica: atravessaveis por baixo, pisaveis por cima.
+ // O muro e fisicamente intransponivel pelas laterais.
+ std::vector<Rect> oneWay={
+  {0,295,460,16}, {460,295,585,16}, // comercio
+  {1270,277,320,12}, {1680,335,430,12}, // telhados das casas
+  {2110,425,210,12} // topo do muro de separacao
  };
+ std::vector<Rect> solid={
+  {1995,GROUND-64,64,64}, // caixa de acesso, no chao
+  {2790,GROUND-64,64,64}  // caixa entre os corregos
+ };
+ const Rect barrier{2110,437,210,178};
  // A grade em frente a casa continua decorativa e nao recebe colisao.
  std::array<Rect,3> movers{{{3320,520,145,22},{3710,465,145,22},{4130,510,145,22}}};
- float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND;
+ float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND,dropTimer=0;
  bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;
  Uint64 prev=SDL_GetPerformanceCounter();double freq=double(SDL_GetPerformanceFrequency());
- auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=0;};
+ auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;};
  while(appletMainLoop()&&running){
   Uint64 now=SDL_GetPerformanceCounter();float dt=std::min(float((now-prev)/freq),0.033f);prev=now;worldTime+=dt;
   SDL_Event ev;while(SDL_PollEvent(&ev))if(ev.type==SDL_QUIT)running=false;
@@ -164,14 +162,22 @@ int main(int,char**){
   if(h<0)facingLeft=true;else if(h>0)facingLeft=false;
   for(int i=0;i<3;i++){float origins[3]={3320,3710,4130};float ranges[3]={110,140,115};float speeds[3]={1.1f,.95f,1.25f};movers[i].x=origins[i]+ranges[i]*std::sin(worldTime*speeds[i]+i);}
   if(fadeState==0&&!finished){
-   if(down&HidNpadButton_A)play(audio,mix,laura_effort,laura_effort_count,.5f);
+   dropTimer=std::max(0.f,dropTimer-dt);
+   if((down&HidNpadButton_A)&&grounded){
+    bool onOneWay=false;
+    for(const auto& p:oneWay)if(std::fabs(y+35-p.y)<3&&x+26>p.x&&x-26<p.x+p.w)onOneWay=true;
+    for(const auto& p:movers)if(std::fabs(y+35-p.y)<3&&x+26>p.x&&x-26<p.x+p.w)onOneWay=true;
+    if(onOneWay){dropTimer=.30f;grounded=false;vy=110;y+=9;landTimer=0;play(audio,mix,laura_effort,laura_effort_count,.35f);}
+   }
    if((down&HidNpadButton_B)&&grounded&&hurtTimer<=0){vy=-650;grounded=false;jumpElapsed=0;peakFeet=y+35;play(audio,mix,laura_jump,laura_jump_count,.65f);}
    if(hurtTimer>0){hurtTimer=std::max(0.f,hurtTimer-dt);h=0;}
    if(landTimer>0)landTimer=std::max(0.f,landTimer-dt);
    float oldX=x,oldY=y;float nextX=std::max(35.f,std::min(WORLD-35.f,x+h*420*dt));
    Rect player{nextX-26,y-35,52,70};
    // Paredes de blocos solidos
-   for(const auto& p:solid){if(player.y+player.h>p.y+3&&player.y<p.y+p.h-3){if(nextX>oldX&&oldX+26<=p.x&&nextX+26>p.x)nextX=p.x-26;if(nextX<oldX&&oldX-26>=p.x+p.w&&nextX-26<p.x+p.w)nextX=p.x+p.w+26;}}
+   auto sideBlock=[&](const Rect& p){if(player.y+player.h>p.y+3&&player.y<p.y+p.h-3){if(nextX>oldX&&oldX+26<=p.x&&nextX+26>p.x)nextX=p.x-26;if(nextX<oldX&&oldX-26>=p.x+p.w&&nextX-26<p.x+p.w)nextX=p.x+p.w+26;}};
+   for(const auto& p:solid)sideBlock(p);
+   sideBlock(barrier);
    x=nextX;
    if(!grounded){vy=std::min(1050.f,vy+1500.f*(vy>0?1.18f:1.f)*dt);y+=vy*dt;jumpElapsed+=dt;peakFeet=std::min(peakFeet,y+35);}
    bool landed=false;float landedY=GROUND;bool onMoving=false;int movingIndex=-1;
@@ -180,7 +186,11 @@ int main(int,char**){
     if(vy<0 && oldY-35>=p.y+p.h && y-35<=p.y+p.h){y=p.y+p.h+35;vy=0;}
    };
    for(const auto&p:solid)landing(p,false,-1);
-   for(int i=0;i<3;i++)landing(movers[i],true,i);
+   if(dropTimer<=0)for(const auto&p:oneWay){
+    if(x+26>p.x&&x-26<p.x+p.w&&vy>=0&&oldY+35<=p.y+5&&y+35>=p.y)
+     if(!landed||p.y<landedY){landed=true;landedY=p.y;onMoving=false;}
+   }
+   if(dropTimer<=0)for(int i=0;i<3;i++)landing(movers[i],true,i);
    // solo somente nas regioes secas
    bool landRegion=(x<2320 || (x>=2660&&x<3170) || x>=4510);
    if(landRegion&&vy>=0&&oldY+35<=GROUND&&y+35>=GROUND){if(!landed||GROUND<landedY){landed=true;landedY=GROUND;onMoving=false;}}
@@ -189,7 +199,8 @@ int main(int,char**){
    }else{
     bool supported=landRegion&&std::fabs(y+35-GROUND)<2;
     for(const auto&p:solid)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
-    for(int i=0;i<3;i++)if(std::fabs(y+35-movers[i].y)<2&&x+26>movers[i].x&&x-26<movers[i].x+movers[i].w){supported=true;float speed[3]={1.1f,.95f,1.25f};float range[3]={110,140,115};x+=range[i]*speed[i]*std::cos(worldTime*speed[i]+i)*dt;}
+    if(dropTimer<=0)for(const auto&p:oneWay)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
+    for(int i=0;i<3;i++)if(dropTimer<=0&&std::fabs(y+35-movers[i].y)<2&&x+26>movers[i].x&&x-26<movers[i].x+movers[i].w){supported=true;float speed[3]={1.1f,.95f,1.25f};float range[3]={110,140,115};x+=range[i]*speed[i]*std::cos(worldTime*speed[i]+i)*dt;}
     if(grounded&&!supported){grounded=false;vy=0;jumpElapsed=.2f;peakFeet=y+35;}
    }
    if(!collected&&std::fabs(x-804)<65&&std::fabs((y-35)-270)<80){collected=true;play(audio,mix,sfx_healed1,sfx_healed1_count,.75f);}
