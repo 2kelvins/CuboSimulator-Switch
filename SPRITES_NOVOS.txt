@@ -1,0 +1,11 @@
+Laura Adventure 0.5 - sprites novos
+
+Sprites fornecidos pelo usuario (18 PNGs RGBA de 149x168).
+Sequencias: parado_001; corrida_001..006; salto_001..004; aterrissagem_001..004; dano_001..003.
+O arquivo original corrida__006.png foi preservado com esse nome.
+source/laura_frames.h contem os mesmos pixels embutidos em RLE, usados diretamente pelo jogo.
+Nao e necessario instalar biblioteca PNG no Switch.
+O sprite e desenhado com altura 85 pixels de tela, ancorado pelos pes.
+Para alterar sprites, atualize tambem o header RLE correspondente.
+O codigo original de fisica, camera, plataformas e audio foi preservado.
+Compilacao ainda nao testada no ambiente devkitPro.
