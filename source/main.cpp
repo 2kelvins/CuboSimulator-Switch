@@ -69,12 +69,12 @@ static void rabbit(SDL_Renderer*r,float x,float y,int cam){
 static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& blocks,const std::array<Rect,3>& moving,bool collected){
  fill(r,0,0,SW,SH,127,195,231);
  // Parallax distante: morros e predios (0.14x)
- for(int i=0;i<22;i++){int px=i*210-int(cam*.14f);fill(r,px,235+(i%4)*16,190,260,94,157,156);fill(r,px+65,170+(i%3)*35,75,255,171,180,170);}
+ for(int i=0;i<22;i++){int px=i*210-int(cam*.14f);fill(r,px,235+(i%4)*16,190,GROUND-(235+(i%4)*16),94,157,156);fill(r,px+65,170+(i%3)*35,75,GROUND-(170+(i%3)*35),171,180,170);}
  // Predios de condominio (0.25x)
- for(int i=0;i<23;i++){int px=i*265-int(cam*.25f);int top=250+(i%4)*21;fill(r,px,top,110,340,196,184,161);for(int j=0;j<3;j++)for(int k=0;k<4;k++)fill(r,px+14+j*32,top+30+k*54,15,24,99,125,138);}
+ for(int i=0;i<23;i++){int px=i*265-int(cam*.25f);int top=250+(i%4)*21;fill(r,px,top,110,GROUND-top,196,184,161);for(int j=0;j<3;j++)for(int k=0;k<4;k++)fill(r,px+14+j*32,top+30+k*54,15,24,99,125,138);}
  // Casas e arvores no plano medio (0.43x)
- for(int i=0;i<34;i++){int px=i*175-int(cam*.43f);fill(r,px,400+(i%3)*14,118,170,204,167,134);fill(r,px-8,389+(i%3)*14,132,17,152,79,62);
-  fill(r,px+137,390,9,140,93,67,46);fill(r,px+103,344,76,55,58,122,74);fill(r,px+114,327,53,45,72,137,80);}
+ for(int i=0;i<34;i++){int px=i*175-int(cam*.43f);fill(r,px,400+(i%3)*14,118,GROUND-(400+(i%3)*14),204,167,134);fill(r,px-8,389+(i%3)*14,132,17,152,79,62);
+  fill(r,px+137,390,9,GROUND-390,93,67,46);fill(r,px+103,344,76,55,58,122,74);fill(r,px+114,327,53,45,72,137,80);}
  // Vila
  building(r,0,312,460,303,88,144,143,int(cam));building(r,460,310,585,305,206,164,111,int(cam));
  fill(r,12,362,430,40,36,102,111,int(cam));label(r,"MERCADO",92,371,4,245,213,151,int(cam));
@@ -119,7 +119,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
 }
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
@@ -135,16 +135,22 @@ int main(int,char**){
  Mixer mix{};SDL_AudioSpec want{};want.freq=48000;want.format=AUDIO_S16SYS;want.channels=1;want.samples=1024;want.callback=audioCallback;want.userdata=&mix;
  SDL_AudioDeviceID audio=SDL_OpenAudioDevice(nullptr,0,&want,nullptr,0);if(audio)SDL_PauseAudioDevice(audio,0);
  padConfigureInput(1,HidNpadStyleSet_NpadStandard);PadState pad;padInitializeDefault(&pad);
+ // Rota de ida e volta: primeiro alcancar a caixa junto ao muro do corrego,
+ // subir a escadinha de muros e regressar pela parte alta ate a padaria.
+ // Os telhados do comercio nao podem ser alcancados diretamente do chao.
  std::vector<Rect> solid={
-  {0,295,460,16},{460,295,585,16}, // telhados comercio
-  {1070,515,64,64},{1145,425,64,64},{1030,342,64,64}, // caixas para subir
-  {1270,265,320,18},{1490,425,160,18},{1680,325,430,18},{2060,510,64,64},
-  {2170,510,64,64},{2660,510,64,64},{2970,510,64,64},
-  {4520,510,64,64}
+  {0,295,460,16},{460,295,585,16}, // telhados mercado e padaria
+  {1995,GROUND-64,64,64},           // unica caixa de subida, encostada no primeiro muro
+  {1980,470,135,18},                // primeiro patamar (145px acima do chao)
+  {1830,395,190,18},                // muro intermediario
+  {1670,325,220,18},                // telhado da casa
+  {1500,350,200,18},                // muro alto que permite voltar para esquerda
+  {1330,345,185,18},                // caminho sobre o muro, sem usar a grade
+  {1175,335,170,18},                // passarela de retorno
+  {1015,295,180,18},                // conexao ao telhado da padaria
+  {2790,GROUND-64,64,64}            // caixa apoiada no solo entre os corregos
  };
- // Plataforma alta adicional liga subida ao telhado da padaria.
- solid.push_back({1090,385,170,16});solid.push_back({1170,290,130,16});
- for(int i=0;i<8;i++)solid.push_back({4510.0f+i*76,615.0f-i*35,80,SH-(615.0f-i*35)});
+ // A grade em frente a casa continua decorativa e nao recebe colisao.
  std::array<Rect,3> movers{{{3320,520,145,22},{3710,465,145,22},{4130,510,145,22}}};
  float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND;
  bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;
