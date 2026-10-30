@@ -1,0 +1,9 @@
+Laura Adventure 1.0.3
+- Muro alto separando a vila do primeiro corrego.
+- Caixa mantida no chao antes do muro.
+- Removidas plataformas artificiais diante das casas.
+- Telhados e topo do muro: plataformas de mao unica, atravessaveis por baixo.
+- Botao A: descer de telhados e plataformas moveis.
+- Botao B: saltar.
+- Plataformas moveis somente nos corregos.
+- Sem alteracoes nos sprites e audios.
