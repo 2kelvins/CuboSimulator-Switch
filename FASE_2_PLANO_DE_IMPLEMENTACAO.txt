@@ -1,0 +1,21 @@
+LAURA ADVENTURE - FASE 2 / CAMINHO DAS NUVENS
+BASE PRESERVADA: 1.0.11
+
+ASSETS DA MAMAE: seis imagens originais preservadas em assets/mamae_dentista.
+Header source/mamae_frames.h com pixels RGBA originais compactados em RLE,
+pronto para usar no carregador SDL2.
+
+SEQUENCIA DE INTERACAO DEFINIDA:
+1. Esperando 001/002 alternando lentamente (pisca e luz do celular).
+2. Ao aproximar Laura com capivarinha: APERTE Y PARA FALAR COM A MAMAE.
+3. Y -> interacao 001 + balao de exclamacao a direita da cabeca.
+4. Exclamacao some -> interacao 002 + balao de coracao.
+5. Coracao some -> esperando 001 -> vinheta da fase 1 -> missao concluida.
+
+MAPA: condominio -> buraco -> grade/caixa -> muros -> telhados -> nuvens
+-> arvore/galhos -> capivarinha -> nuvens descendentes -> telhado consultorio
+-> toldos autoescola Pantanal -> escadaria -> Mamãe Dentista.
+
+ESTADO DESTE PACOTE: PREPARACAO DOS ASSETS, NAO E UMA FASE 2 JOGAVEL.
+O source/main.cpp da 1.0.11 continua intacto.
+Proxima etapa: implementar fisica, camera vertical, geometria e fluxo de fases.
