@@ -1,0 +1,7 @@
+Laura Adventure 1.0.4 - correcao da escola
+- Degraus finais com colisoes de pouso.
+- Base da escola preenchida ate o solo; patio na altura do ultimo degrau.
+- Missao termina ao tocar a porta, somente com coelho coletado.
+- HUD apos coelho: VA PARA A ESCOLA.
+- Nova vinheta original de conclusao, ~3 segundos, no mixer de 8 canais.
+- Nao compilado nem testado no Nintendo Switch.
