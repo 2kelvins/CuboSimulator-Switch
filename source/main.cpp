@@ -104,8 +104,22 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  for(int n=0;n<2;n++){int a=n==0?2320:3170,b=n==0?2660:4510;
   fill(r,a,618,b-a,SH-618,53,101,77,int(cam));for(int i=a;i<b;i+=45){int wig=int(3*std::sin(time*2+i*.08));fill(r,i,624+wig,25,3,119,157,114,int(cam));}
  }
- // Jacare no segundo corrego
- fill(r,3720,675,172,24,65,102,43,int(cam));fill(r,3865,664,55,29,69,112,48,int(cam));fill(r,3897,673,6,5,226,220,133,int(cam));
+ // Jacare animado: corpo ondulante, cauda, patas, focinho, dentes e olho.
+ float crocX=3730+145*std::sin(time*.72f), bob=3*std::sin(time*2.8f);
+ float tail=22*std::sin(time*3.1f);
+ fill(r,crocX-65,681+tail*.25f,82,13,62,99,46,int(cam));
+ fill(r,crocX-94,686+tail*.45f,34,7,59,94,42,int(cam));
+ fill(r,crocX,666+bob,177,30,66,112,47,int(cam));
+ for(int j=0;j<8;j++)fill(r,crocX+10+j*20,661+bob+(j%2)*3,12,8,48,85,39,int(cam));
+ fill(r,crocX+23,691+bob,24,10,50,89,39,int(cam));
+ fill(r,crocX+130,691+bob,23,10,50,89,39,int(cam));
+ fill(r,crocX+160,654+bob,47,32,75,127,51,int(cam));
+ fill(r,crocX+191,672+bob,60,14,78,126,50,int(cam));
+ fill(r,crocX+194,682+bob,54,6,51,77,40,int(cam));
+ for(int j=0;j<5;j++)fill(r,crocX+199+j*10,680+bob,5,5,240,235,199,int(cam));
+ fill(r,crocX+183,661+bob,9,8,248,242,190,int(cam));
+ fill(r,crocX+187,662+bob,3,4,26,34,22,int(cam));
+ fill(r,crocX+238,672+bob,5,4,37,64,29,int(cam));
  // Escadaria solida visualmente: degraus apoiados no terreno e colisoes no topo.
  for(int i=0;i<8;i++){float xx=4510+i*76, yy=615-i*35;fill(r,xx,yy,80,SH-yy,96,97,88,int(cam));fill(r,xx,yy,80,9,178,176,150,int(cam));}
  // A escola tem alicerce ate o solo, sem vazio embaixo.
@@ -124,7 +138,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
 }
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.4",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.5",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
@@ -152,22 +166,30 @@ int main(int,char**){
   {1995,GROUND-64,64,64}, // caixa de acesso, no chao
   {2790,GROUND-64,64,64}  // caixa entre os corregos
  };
- // Degraus: topo atravessavel por baixo e pisavel por cima, sem bloquear lateralmente.
- for(int i=0;i<8;i++)oneWay.push_back({4510.f+i*76.f,615.f-i*35.f,80.f,12.f});
+ // Degraus realmente solidos: a Laura nao atravessa lateralmente nem por baixo.
+ // Cada degrau e uma coluna de alvenaria ate o fundo do terreno.
+ std::vector<Rect> stairs;
+ for(int i=0;i<8;i++)stairs.push_back({4510.f+i*76.f,615.f-i*35.f,76.f,720.f-(615.f-i*35.f)});
+ const Rect schoolBase{5050,370,600,350};
  const Rect barrier{2110,437,210,178};
  // A grade em frente a casa continua decorativa e nao recebe colisao.
- std::array<Rect,3> movers{{{3320,520,145,22},{3710,465,145,22},{4130,510,145,22}}};
+ std::array<Rect,3> movers{{{2880,442,145,22},{3540,475,145,22},{4110,510,145,22}}};
  float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND,dropTimer=0;
- bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;
+ bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;int menuChoice=0;
  Uint64 prev=SDL_GetPerformanceCounter();double freq=double(SDL_GetPerformanceFrequency());
- auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;};
+ auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;};
  while(appletMainLoop()&&running){
   Uint64 now=SDL_GetPerformanceCounter();float dt=std::min(float((now-prev)/freq),0.033f);prev=now;worldTime+=dt;
   SDL_Event ev;while(SDL_PollEvent(&ev))if(ev.type==SDL_QUIT)running=false;
   padUpdate(&pad);u64 down=padGetButtonsDown(&pad);if(down&HidNpadButton_Plus)running=false;
   HidAnalogStickState stick=padGetStickPos(&pad,0);float h=float(stick.x)/32767.f;if(std::fabs(h)<.15f)h=0;
   if(h<0)facingLeft=true;else if(h>0)facingLeft=false;
-  for(int i=0;i<3;i++){float origins[3]={3320,3710,4130};float ranges[3]={110,140,115};float speeds[3]={1.1f,.95f,1.25f};movers[i].x=origins[i]+ranges[i]*std::sin(worldTime*speeds[i]+i);}
+  if(finished){
+   // Proximo nivel bloqueado: somente REINICIAR e acionavel.
+   if(down&(HidNpadButton_Down|HidNpadButton_Up))menuChoice=1-menuChoice;
+   if((down&(HidNpadButton_A|HidNpadButton_B))&&menuChoice==0)reset();
+  }
+  for(int i=0;i<3;i++){float origins[3]={2880,3540,4110};float ranges[3]={22,135,115};float speeds[3]={.85f,.95f,1.25f};movers[i].x=origins[i]+ranges[i]*std::sin(worldTime*speeds[i]+i);}
   if(fadeState==0&&!finished){
    dropTimer=std::max(0.f,dropTimer-dt);
    if((down&HidNpadButton_A)&&grounded){
@@ -185,6 +207,13 @@ int main(int,char**){
    auto sideBlock=[&](const Rect& p){if(player.y+player.h>p.y+3&&player.y<p.y+p.h-3){if(nextX>oldX&&oldX+26<=p.x&&nextX+26>p.x)nextX=p.x-26;if(nextX<oldX&&oldX-26>=p.x+p.w&&nextX-26<p.x+p.w)nextX=p.x+p.w+26;}};
    for(const auto& p:solid)sideBlock(p);
    sideBlock(barrier);
+   // Subida natural de degraus de 35 px: sobe ao encostar se estiver no chao.
+   for(const auto& p:stairs){
+    if(nextX+26>p.x&&nextX-26<p.x+p.w && oldX+26<=p.x+3 && y+35>p.y+2 && y+35<=p.y+39 && grounded && h>0){
+     y=p.y-35;vy=0;grounded=true;
+    }else sideBlock(p);
+   }
+   sideBlock(schoolBase);
    x=nextX;
    if(!grounded){vy=std::min(1050.f,vy+1500.f*(vy>0?1.18f:1.f)*dt);y+=vy*dt;jumpElapsed+=dt;peakFeet=std::min(peakFeet,y+35);}
    bool landed=false;float landedY=GROUND;bool onMoving=false;int movingIndex=-1;
@@ -193,6 +222,8 @@ int main(int,char**){
     if(vy<0 && oldY-35>=p.y+p.h && y-35<=p.y+p.h){y=p.y+p.h+35;vy=0;}
    };
    for(const auto&p:solid)landing(p,false,-1);
+   for(const auto&p:stairs)landing(p,false,-1);
+   landing(schoolBase,false,-1);
    if(dropTimer<=0)for(const auto&p:oneWay){
     if(x+26>p.x&&x-26<p.x+p.w&&vy>=0&&oldY+35<=p.y+5&&y+35>=p.y)
      if(!landed||p.y<landedY){landed=true;landedY=p.y;onMoving=false;}
@@ -202,12 +233,14 @@ int main(int,char**){
    bool landRegion=(x<2320 || (x>=2660&&x<3170) || x>=4510);
    if(landRegion&&vy>=0&&oldY+35<=GROUND&&y+35>=GROUND){if(!landed||GROUND<landedY){landed=true;landedY=GROUND;onMoving=false;}}
    if(landed){float fall=landedY-peakFeet;y=landedY-35;peakFeet=landedY;vy=0;if(!grounded){if(fall>480){hurtTimer=.54f;play(audio,mix,sfx_damaged1,sfx_damaged1_count,.5f);}else landTimer=.24f;}grounded=true;
-    if(onMoving&&movingIndex>=0){float speed[3]={1.1f,.95f,1.25f};float range[3]={110,140,115};x+=range[movingIndex]*speed[movingIndex]*std::cos(worldTime*speed[movingIndex]+movingIndex)*dt;}
+    if(onMoving&&movingIndex>=0){float speed[3]={.85f,.95f,1.25f};float range[3]={22,135,115};x+=range[movingIndex]*speed[movingIndex]*std::cos(worldTime*speed[movingIndex]+movingIndex)*dt;}
    }else{
     bool supported=landRegion&&std::fabs(y+35-GROUND)<2;
     for(const auto&p:solid)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
+    for(const auto&p:stairs)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
+    if(std::fabs(y+35-schoolBase.y)<2&&x+26>schoolBase.x&&x-26<schoolBase.x+schoolBase.w)supported=true;
     if(dropTimer<=0)for(const auto&p:oneWay)if(std::fabs(y+35-p.y)<2&&x+26>p.x&&x-26<p.x+p.w)supported=true;
-    for(int i=0;i<3;i++)if(dropTimer<=0&&std::fabs(y+35-movers[i].y)<2&&x+26>movers[i].x&&x-26<movers[i].x+movers[i].w){supported=true;float speed[3]={1.1f,.95f,1.25f};float range[3]={110,140,115};x+=range[i]*speed[i]*std::cos(worldTime*speed[i]+i)*dt;}
+    for(int i=0;i<3;i++)if(dropTimer<=0&&std::fabs(y+35-movers[i].y)<2&&x+26>movers[i].x&&x-26<movers[i].x+movers[i].w){supported=true;float speed[3]={.85f,.95f,1.25f};float range[3]={22,135,115};x+=range[i]*speed[i]*std::cos(worldTime*speed[i]+i)*dt;}
     if(grounded&&!supported){grounded=false;vy=0;jumpElapsed=.2f;peakFeet=y+35;}
    }
    if(!collected&&std::fabs(x-804)<65&&std::fabs((y-35)-270)<80){collected=true;play(audio,mix,sfx_healed1,sfx_healed1_count,.75f);}
@@ -215,7 +248,7 @@ int main(int,char**){
    bool water=((x>=2320&&x<2660)||(x>=3170&&x<4510));
    if(water&&y+35>=618){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
    // Conclusao exige tocar a porta, com o coelho coletado e sobre o patio.
-   if(collected && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=376){
+   if(collected && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=380){
     finished=true;play(audio,mix,sfx_complete,sfx_complete_count,.85f);
    }
   }
@@ -238,7 +271,18 @@ int main(int,char**){
   if(selected==15)SDL_SetTextureColorMod(anim[selected],255,174,174);
   SDL_RenderCopyEx(r,anim[selected],nullptr,&dest,0,nullptr,facingLeft?SDL_FLIP_HORIZONTAL:SDL_FLIP_NONE);
   if(selected==15)SDL_SetTextureColorMod(anim[selected],255,255,255);
-  if(finished){fill(r,310,255,660,175,31,84,73);label(r,"MISSAO CONCLUIDA",349,289,5,250,233,180,0);label(r,"LAURA CHEGOU A ESCOLA",375,365,3,250,233,180,0);}
+  if(finished){
+   fill(r,265,184,750,340,27,75,67);
+   fill(r,277,196,726,316,48,108,93);
+   label(r,"MISSAO CONCLUIDA",326,228,5,250,233,180,0);
+   label(r,"LAURA CHEGOU A ESCOLA",348,302,3,250,233,180,0);
+   fill(r,345,367,590,48,menuChoice==0?229:70,menuChoice==0?196:113,menuChoice==0?114:102);
+   label(r,"REINICIAR",474,377,4,menuChoice==0?36:217,menuChoice==0?67:230,menuChoice==0?59:209,0);
+   fill(r,345,430,590,48,menuChoice==1?105:67,menuChoice==1?117:92,menuChoice==1?109:86);
+   label(r,"PROXIMO NIVEL",405,441,3,171,178,170,0);
+   // Cadeado pixelado para o nivel que ainda nao existe.
+   fill(r,827,440,20,23,190,194,181);fill(r,832,432,10,11,190,194,181);fill(r,836,448,3,8,68,83,72);
+  }
   if(fade>0){SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));SDL_Rect full{0,0,SW,SH};SDL_RenderFillRect(r,&full);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);}
   SDL_RenderPresent(r);
  }
