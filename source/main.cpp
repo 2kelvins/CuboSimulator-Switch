@@ -11,22 +11,28 @@
 #include "level_sounds.h"
 #include "level_complete.h"
 #include "lauras_theme.h"
+#include "lauras_sunset.h"
+#include "title_art.h"
 
 constexpr int SW=1280, SH=720;
 constexpr float WORLD=5650.0f, GROUND=615.0f;
 struct Voice {const int16_t* data=nullptr; int len=0,pos=0; float volume=1;};
-struct Mixer { Voice voices[8]; bool musicPlaying=true; int musicPos=0; float musicVolume=0.25f; };
+struct Mixer { Voice voices[8]; bool musicPlaying=true; int musicTrack=0; int musicPos=0; float musicVolume=0.25f; };
 static void audioCallback(void* p, Uint8* stream,int len) {
  Mixer& m=*static_cast<Mixer*>(p); auto* dst=(int16_t*)stream;
  for(int i=0;i<len/2;++i){int sum=0;
   for(auto& v:m.voices) if(v.data && v.pos<v.len){sum+=int(v.data[v.pos++]*v.volume);if(v.pos==v.len)v.data=nullptr;}
-  // 24 kHz source played at 48 kHz: linear interpolation, seamless loop.
-  if(m.musicPlaying && lauras_theme_count>1){
-   int idx=(m.musicPos/2)%lauras_theme_count;
-   int next=(idx+1)%lauras_theme_count;
-   int value=(m.musicPos&1)?(int(lauras_theme_pcm[idx])+int(lauras_theme_pcm[next]))/2:int(lauras_theme_pcm[idx]);
-   sum+=int(value*256*m.musicVolume);
-   m.musicPos=(m.musicPos+1)%(lauras_theme_count*2);
+  // Both original soundtracks are 24 kHz mono; output is 48 kHz mono.
+  if(m.musicPlaying){
+   const int8_t* track=m.musicTrack==0?lauras_sunset_pcm:lauras_theme_pcm;
+   const int count=m.musicTrack==0?lauras_sunset_count:lauras_theme_count;
+   if(count>1){
+    int idx=(m.musicPos/2)%count;
+    int next=(idx+1)%count;
+    int value=(m.musicPos&1)?(int(track[idx])+int(track[next]))/2:int(track[idx]);
+    sum+=int(value*256*m.musicVolume);
+    m.musicPos=(m.musicPos+1)%(count*2);
+   }
   }
   dst[i]=(int16_t)std::max(-32768,std::min(32767,sum));
  }
@@ -148,7 +154,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
 }
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.5",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.0.10",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
@@ -161,8 +167,13 @@ int main(int,char**){
  };
  const FrameData* frames[]={&frame_parado_001,&frame_corrida_001,&frame_corrida_002,&frame_corrida_003,&frame_corrida_004,&frame_corrida_005,&frame_corrida_006,&frame_salto_001,&frame_salto_002,&frame_salto_003,&frame_salto_004,&frame_aterrissagem_001,&frame_aterrissagem_002,&frame_aterrissagem_003,&frame_aterrissagem_004,&frame_dano_001,&frame_dano_002,&frame_dano_003};
  SDL_Texture* anim[18]{};for(int i=0;i<18;i++){anim[i]=loadFrame(*frames[i]);if(!anim[i]){SDL_Quit();return 4;}}
+ SDL_Texture* titleTexture=SDL_CreateTexture(r,SDL_PIXELFORMAT_RGB565,SDL_TEXTUREACCESS_STATIC,title_art_width,title_art_height);
+ if(titleTexture){
+  SDL_UpdateTexture(titleTexture,nullptr,title_art_rgb565,title_art_width*int(sizeof(uint16_t)));
+  SDL_SetTextureBlendMode(titleTexture,SDL_BLENDMODE_NONE);
+ }
  Mixer mix{};SDL_AudioSpec want{};want.freq=48000;want.format=AUDIO_S16SYS;want.channels=1;want.samples=1024;want.callback=audioCallback;want.userdata=&mix;
- SDL_AudioDeviceID audio=SDL_OpenAudioDevice(nullptr,0,&want,nullptr,0);if(audio)SDL_PauseAudioDevice(audio,0);
+ SDL_AudioDeviceID audio=SDL_OpenAudioDevice(nullptr,0,&want,nullptr,0);if(audio){mix.musicPlaying=true;mix.musicTrack=0;mix.musicPos=0;SDL_PauseAudioDevice(audio,0);}
  padConfigureInput(1,HidNpadStyleSet_NpadStandard);PadState pad;padInitializeDefault(&pad);
  // Superficies de mao unica: atravessaveis por baixo, pisaveis por cima.
  // O muro e fisicamente intransponivel pelas laterais.
@@ -194,14 +205,36 @@ int main(int,char**){
  // A grade em frente a casa continua decorativa e nao recebe colisao.
  std::array<Rect,3> movers{{{2880,442,145,22},{3540,475,145,22},{4110,510,145,22}}};
  float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND,dropTimer=0;
- bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;int menuChoice=0;
+ bool titleScreen=true;bool paused=false;float titleTime=0;bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;int menuChoice=0;
  Uint64 prev=SDL_GetPerformanceCounter();double freq=double(SDL_GetPerformanceFrequency());
- auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}};
+ auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicTrack=1;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}};
  while(appletMainLoop()&&running){
-  Uint64 now=SDL_GetPerformanceCounter();float dt=std::min(float((now-prev)/freq),0.033f);prev=now;worldTime+=dt;
+  Uint64 now=SDL_GetPerformanceCounter();float dt=std::min(float((now-prev)/freq),0.033f);prev=now;
+  if(!titleScreen&&!paused)worldTime+=dt;
   SDL_Event ev;while(SDL_PollEvent(&ev))if(ev.type==SDL_QUIT)running=false;
-  padUpdate(&pad);u64 down=padGetButtonsDown(&pad);if(down&HidNpadButton_Plus)running=false;
-  HidAnalogStickState stick=padGetStickPos(&pad,0);float h=float(stick.x)/32767.f;if(std::fabs(h)<.15f)h=0;
+  padUpdate(&pad);u64 down=padGetButtonsDown(&pad);
+  if(titleScreen){
+   titleTime+=dt;
+   if(down&(HidNpadButton_A|HidNpadButton_B|HidNpadButton_Plus)){
+    titleScreen=false;reset();
+    down=0; // Nao reutilizar Start como comando de sair no mesmo quadro.
+   }
+   // Arte original enviada pelo usuario: exibida integralmente.
+   SDL_SetRenderDrawColor(r,0,0,0,255);SDL_RenderClear(r);
+   if(titleTexture)SDL_RenderCopy(r,titleTexture,nullptr,nullptr);
+   SDL_RenderPresent(r);
+   continue;
+  }
+  // + abre a aventura na tela inicial; durante o jogo nao encerra o aplicativo.
+  // Para sair, use HOME do Switch.
+  // + alterna pause e jogo, inclusive apos concluir a fase.
+  if(down&HidNpadButton_Plus){
+   paused=!paused;
+   if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=!paused&&!finished;SDL_UnlockAudioDevice(audio);}
+  }
+  float h=0;
+  if(!paused){
+  HidAnalogStickState stick=padGetStickPos(&pad,0);h=float(stick.x)/32767.f;if(std::fabs(h)<.15f)h=0;
   if(h<0)facingLeft=true;else if(h>0)facingLeft=false;
   if(finished){
    // Proximo nivel bloqueado: somente REINICIAR e acionavel.
@@ -285,6 +318,7 @@ int main(int,char**){
   else if(fadeState==2){fade=std::max(0.f,fade-dt/.4f);if(fade<=0)fadeState=0;}
   if(grounded&&std::fabs(h)>.1f)runClock+=dt*12;else runClock=0;
   cam+=((std::max(0.f,std::min(WORLD-SW,x-410)))-cam)*std::min(1.f,dt*6);
+  } // End gameplay updates: all motion, collision, timers and input freeze on pause.
   scene(r,cam,worldTime,solid,movers,returnPlatforms,collected);
   // Indicador de objetivo (sem dependencia de fonte)
   fill(r,18,18,375,42,32,57,65);label(r,collected?"VA PARA A ESCOLA":"PEGUE O COELHO",35,28,3,250,240,214,0);
@@ -313,7 +347,17 @@ int main(int,char**){
    fill(r,827,440,20,23,190,194,181);fill(r,832,432,10,11,190,194,181);fill(r,836,448,3,8,68,83,72);
   }
   if(fade>0){SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));SDL_Rect full{0,0,SW,SH};SDL_RenderFillRect(r,&full);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);}
+  if(paused){
+   SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
+   SDL_SetRenderDrawColor(r,8,16,32,160);
+   SDL_Rect veil{0,0,SW,SH};SDL_RenderFillRect(r,&veil);
+   SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
+   fill(r,395,270,490,170,25,52,78);
+   fill(r,404,279,472,152,54,95,115);
+   label(r,"PAUSE",475,320,11,255,238,178,0);
+   label(r,"START PARA VOLTAR",467,402,2,245,236,216,0);
+  }
   SDL_RenderPresent(r);
  }
- if(audio)SDL_CloseAudioDevice(audio);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
+ if(audio)SDL_CloseAudioDevice(audio);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
 }
