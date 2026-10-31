@@ -156,7 +156,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
 
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.1 - Fase 2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.2 - Fase 2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);

@@ -1,0 +1,38 @@
+LAURA ADVENTURE - FASE 2 - REVISAO 03 (9 CORRECOES)
+Branch: fase-2 (NAO enviar para main)
+
+MUDANCAS
+01. Fosso inicial em marrom/preto profundo; Laura cai ate metade do sprite sair da tela, fade preto com som e retorno ao inicio.
+02. Condominio inicial agora tem tres predios de alturas e cores distintas, com janelas e pintura envelhecida. O primeiro e alto e fica mais a esquerda.
+03. Muros mantem aterrissagem por cima e passagem vertical por baixo; a entrada lateral durante a escalada esta bloqueada. Fachada frontal continua reduz o visual de escadinhas soltas.
+04. Tres nuvens iniciais sobem com o primeiro predio, mantendo a ordem ascendente original.
+05. Camera revela mais plataformas abaixo da Laura durante descidas, com transicao suave.
+06. Arvore tem apenas um galho intermediario opcional; a copa pode ser atingida pela sequencia de nuvens.
+07. Atravessia ate a copa vem pela esquerda. Depois da capivarinha, uma nuvem movel liga a copa a Autoescola.
+08. Consultorio dentario e o ultimo predio. Nao e possivel passar alem do limite direito. Tres nuvens empilhadas permitem descer com A ao telhado do consultorio.
+09. Autoescola e mais alta e fica a esquerda, ao lado da arvore. Consultorio e mais baixo. Toldos empilhados ficam na lateral da Autoescola para descer usando A. Escada sobe da esquerda para direita e a Mamae aguarda diante da porta de vidro, voltada a esquerda.
+
+MECANICAS MANTIDAS
+- Coelho obrigatorio na Fase 1, sem alteracoes nessa fase.
+- Capivarinha obrigatoria na Fase 2. Se falhar, reinicia e volta a ser coletavel.
+- Y perto da Mamae, depois de coletar: exclamacao, piscadinha/coracao, retorno ao idle e vinheta de vitoria.
+- A atravessa de cima para baixo nuvens, muros e toldos; B pula; + pausa/despausa.
+- X na tela inicial abre diretamente a Fase 2 para testar. A/B/+ iniciam a Fase 1.
+- Enquanto nao compomos BGM nova, a Fase 2 usa Laura's Theme.
+
+TESTES NO SWITCH
+[ ] Buraco: imagem da Laura some metade antes de fade e som.
+[ ] Caixa, muros: salto sem entrar na lateral; passar por baixo, pousar por cima.
+[ ] Telhados: saltos entre tres predios possiveis.
+[ ] Nuvens iniciais e travessia movel: sem salto impossivel.
+[ ] Camera mostra plataformas abaixo durante descida.
+[ ] Arvore: capivarinha coletavel sem galho inferior obrigatorio.
+[ ] Agua: reinicio apos cair.
+[ ] Autoescola, descida das tres nuvens e toldos: A funciona.
+[ ] Consultorio: barreira direita e escada ascendente.
+[ ] Mamae: Y, !, coracao, retorno ao idle, vitoria.
+[ ] Fase 1 continua funcionando.
+
+VALIDACAO
+- Teste sintatico C++ no PC com cabecalhos de simulacao SDL/libnx: aprovado.
+- Compilacao real devkitPro e teste fisico Nintendo Switch: AINDA NAO EXECUTADOS nesta revisao.
