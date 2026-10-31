@@ -12,6 +12,7 @@
 #include "level_complete.h"
 #include "lauras_theme.h"
 #include "lauras_sunset.h"
+#include "lauras_cloud_hop.h"
 #include "title_art.h"
 
 constexpr int SW=1280, SH=720;
@@ -22,16 +23,24 @@ static void audioCallback(void* p, Uint8* stream,int len) {
  Mixer& m=*static_cast<Mixer*>(p); auto* dst=(int16_t*)stream;
  for(int i=0;i<len/2;++i){int sum=0;
   for(auto& v:m.voices) if(v.data && v.pos<v.len){sum+=int(v.data[v.pos++]*v.volume);if(v.pos==v.len)v.data=nullptr;}
-  // Both original soundtracks are 24 kHz mono; output is 48 kHz mono.
+  // All three original soundtracks are 24 kHz mono; output is 48 kHz mono.
   if(m.musicPlaying){
-   const int8_t* track=m.musicTrack==0?lauras_sunset_pcm:lauras_theme_pcm;
-   const int count=m.musicTrack==0?lauras_sunset_count:lauras_theme_count;
+   // 0: titulo; 1: fase 1; 2: fase 2 (Laura's Cloud Hop).
+   const int8_t* track=m.musicTrack==0?lauras_sunset_pcm:
+      (m.musicTrack==2?lauras_cloud_hop_pcm:lauras_theme_pcm);
+   const int count=m.musicTrack==0?lauras_sunset_count:
+      (m.musicTrack==2?lauras_cloud_hop_count:lauras_theme_count);
    if(count>1){
     int idx=(m.musicPos/2)%count;
-    int next=(idx+1)%count;
+    int next=(idx+1<count)?idx+1:(m.musicTrack==2?lauras_cloud_hop_overlap:0);
     int value=(m.musicPos&1)?(int(track[idx])+int(track[next]))/2:int(track[idx]);
     sum+=int(value*256*m.musicVolume);
-    m.musicPos=(m.musicPos+1)%(count*2);
+    ++m.musicPos;
+    if(m.musicPos>=count*2){
+     // A ultima janela de 180 ms da Fase 2 e cruzada com a abertura.
+     // Depois da primeira volta, pular essa abertura evita estalo no loop.
+     m.musicPos=(m.musicTrack==2)?(lauras_cloud_hop_overlap*2):0;
+    }
    }
   }
   dst[i]=(int16_t)std::max(-32768,std::min(32767,sum));
@@ -153,10 +162,31 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  if(!collected)rabbit(r,780,240,int(cam));
 }
 #include "level2.h"
+// Pause menu shared by both stages. D-pad to select; A to confirm; + or B resumes.
+static void pauseMenu(SDL_Renderer* r,int selection){
+ SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
+ SDL_SetRenderDrawColor(r,8,16,32,170);
+ SDL_Rect veil{0,0,SW,SH};SDL_RenderFillRect(r,&veil);
+ SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
+ fill(r,344,199,592,327,29,55,78);
+ fill(r,354,209,572,307,53,96,116);
+ fill(r,365,222,550,69,30,71,91);
+ label(r,"PAUSE",485,231,11,255,233,177,0);
+ for(int i=0;i<2;++i){
+  bool selected=selection==i;
+  int y=316+i*79;
+  fill(r,395,y,490,62,selected?245:62,selected?209:118,selected?151:128);
+  fill(r,405,y+6,470,50,selected?254:74,selected?232:145,selected?185:154);
+  if(i==0)label(r,"CONTINUAR",516,y+17,5,selected?44:228,selected?77:240,selected?88:221,0);
+  else label(r,"TELA INICIAL",480,y+17,4,selected?44:228,selected?77:240,selected?88:221,0);
+ }
+ label(r,"MAIS: VOLTAR    MENOS: SAIR",405,489,2,232,226,212,0);
+}
+
 
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
- SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.2 - Fase 2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
+ SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.2.1 - Fase 2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
  if(!win){SDL_Quit();return 2;}
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
@@ -227,19 +257,34 @@ int main(int,char**){
  // A grade em frente a casa continua decorativa e nao recebe colisao.
  std::array<Rect,3> movers{{{2880,442,145,22},{3540,475,145,22},{4110,510,145,22}}};
  float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND,dropTimer=0;
- bool titleScreen=true;bool paused=false;float titleTime=0;bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;int menuChoice=0;
+ bool titleScreen=true;bool paused=false;int pauseChoice=0;float titleTime=0;bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;int menuChoice=0;
  Uint64 prev=SDL_GetPerformanceCounter();double freq=double(SDL_GetPerformanceFrequency());
- auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicTrack=1;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}};
+ auto setMusic=[&](int track,bool restart,bool playing=true){
+  if(audio){SDL_LockAudioDevice(audio);mix.musicTrack=track;
+   if(restart)mix.musicPos=0;
+   mix.musicPlaying=playing;SDL_UnlockAudioDevice(audio);}
+ };
+ auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;setMusic(1,true);};
+ auto goTitle=[&](){
+  // Reset both stages and clear any queued voice/jingle before restoring the title BGM.
+  reset();level2.reset();stage2=false;titleScreen=true;paused=false;pauseChoice=0;titleTime=0;fade=0;fadeState=0;
+  if(audio){SDL_LockAudioDevice(audio);
+   for(auto&v:mix.voices)v=Voice{};
+   mix.musicTrack=0;mix.musicPos=0;mix.musicPlaying=true;
+   SDL_UnlockAudioDevice(audio);}
+ };
  while(appletMainLoop()&&running){
   Uint64 now=SDL_GetPerformanceCounter();float dt=std::min(float((now-prev)/freq),0.033f);prev=now;
   if(!titleScreen&&!paused)worldTime+=dt;
   SDL_Event ev;while(SDL_PollEvent(&ev))if(ev.type==SDL_QUIT)running=false;
   padUpdate(&pad);u64 down=padGetButtonsDown(&pad);
+  // - fecha o aplicativo em qualquer tela, com encerramento normal do SDL.
+  if(down&HidNpadButton_Minus){running=false;break;}
   if(titleScreen){
    titleTime+=dt;
    if(down&(HidNpadButton_A|HidNpadButton_B|HidNpadButton_Plus|HidNpadButton_X)){
     titleScreen=false;stage2=(down&HidNpadButton_X)!=0;
-    reset();if(stage2)level2.reset();
+    reset();if(stage2){level2.reset();setMusic(2,true);}
     down=0; // Nao reutilizar Start como comando no mesmo quadro.
    }
    // Arte original enviada pelo usuario: exibida integralmente.
@@ -248,12 +293,19 @@ int main(int,char**){
    SDL_RenderPresent(r);
    continue;
   }
-  // + abre a aventura na tela inicial; durante o jogo nao encerra o aplicativo.
-  // Para sair, use HOME do Switch.
-  // + alterna pause e jogo, inclusive apos concluir a fase.
+  // + opens/closes pause. While paused, D-pad selects, A confirms and B resumes.
   if(down&HidNpadButton_Plus){
-   paused=!paused;
-   if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=!paused && (stage2 ? !level2.finished : !finished);SDL_UnlockAudioDevice(audio);}
+   paused=!paused;pauseChoice=0;
+   setMusic(stage2?2:1,false,!paused && (stage2?!level2.finished:!finished));
+   down=0; // Do not let the same button also act on the game/menu.
+  }
+  if(paused){
+   if(down&(HidNpadButton_Up|HidNpadButton_Down))pauseChoice=1-pauseChoice;
+   if(down&HidNpadButton_B){paused=false;setMusic(stage2?2:1,false,stage2?!level2.finished:!finished);down=0;}
+   else if(down&HidNpadButton_A){
+    if(pauseChoice==1){goTitle();continue;}
+    paused=false;setMusic(stage2?2:1,false,stage2?!level2.finished:!finished);down=0;
+   }
   }
   // A segunda fase tem camera vertical, mapa, colisao e HUD independentes.
   // X na tela inicial abre diretamente a fase 2 para testes da branch.
@@ -261,7 +313,7 @@ int main(int,char**){
    if(!paused){
     if(level2.finished&&(down&HidNpadButton_X)){
      level2.reset();
-     if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicTrack=1;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}
+     setMusic(2,true);
     }else{
      HidAnalogStickState s2Stick=padGetStickPos(&pad,0);
      float axis=float(s2Stick.x)/32767.f;
@@ -269,13 +321,7 @@ int main(int,char**){
     }
    }
    level2.render(r,mom,anim,frames);
-   if(paused){
-    SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,8,16,32,160);
-    SDL_Rect veil{0,0,SW,SH};SDL_RenderFillRect(r,&veil);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
-    fill(r,395,270,490,170,25,52,78);fill(r,404,279,472,152,54,95,115);
-    label(r,"PAUSE",475,320,11,255,238,178,0);
-    label(r,"START PARA VOLTAR",467,402,2,245,236,216,0);
-   }
+   if(paused)pauseMenu(r,pauseChoice);
    SDL_RenderPresent(r);
    continue;
   }
@@ -289,8 +335,7 @@ int main(int,char**){
    if(down&(HidNpadButton_A|HidNpadButton_B)){
     if(menuChoice==0)reset();
     else{
-     stage2=true;level2.reset();
-     if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=true;mix.musicTrack=1;mix.musicPos=0;SDL_UnlockAudioDevice(audio);}
+     stage2=true;level2.reset();setMusic(2,true);
     }
    }
   }
@@ -399,16 +444,7 @@ int main(int,char**){
    // Fase 2 agora selecionavel; nao mostrar cadeado.
   }
   if(fade>0){SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));SDL_Rect full{0,0,SW,SH};SDL_RenderFillRect(r,&full);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);}
-  if(paused){
-   SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
-   SDL_SetRenderDrawColor(r,8,16,32,160);
-   SDL_Rect veil{0,0,SW,SH};SDL_RenderFillRect(r,&veil);
-   SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
-   fill(r,395,270,490,170,25,52,78);
-   fill(r,404,279,472,152,54,95,115);
-   label(r,"PAUSE",475,320,11,255,238,178,0);
-   label(r,"START PARA VOLTAR",467,402,2,245,236,216,0);
-  }
+  if(paused)pauseMenu(r,pauseChoice);
   SDL_RenderPresent(r);
  }
  if(audio)SDL_CloseAudioDevice(audio);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;

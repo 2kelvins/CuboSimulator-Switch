@@ -30,7 +30,7 @@ LIBS := -lSDL2 -lEGL -lGLESv2 -lglapi -ldrm_nouveau -lnx
 
 all: $(TARGET).nro
 
-main.o: source/main.cpp source/level2.h source/mamae_frames.h
+main.o: source/main.cpp source/level2.h source/mamae_frames.h source/lauras_cloud_hop.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(TARGET).elf: main.o

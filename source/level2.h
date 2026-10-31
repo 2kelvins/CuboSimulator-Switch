@@ -77,6 +77,7 @@ struct Level2 {
  float fade=0,interactionTimer=0;
  int fadeState=0,interaction=0;
  bool grounded=true,faceLeft=false,collected=false,finished=false;
+ bool cloudCameraActive=false,cloudCameraDone=false;
  std::vector<Rect> walls,roofs,branches,awnings,stairs,ground;
  std::vector<Cloud2> clouds;
  Level2(){
@@ -97,9 +98,11 @@ struct Level2 {
   cloud(135,772,155);cloud(323,687,165);cloud(515,603,165);
   // Baixa um pouco, pega uma movel e atravessa a parte com agua.
   cloud(716,687,174);cloud(929,753,172,52,.9f,.7f);
-  cloud(1128,752,168);cloud(1340,726,175,62,.9f,1.2f);
-  cloud(1560,757,177);cloud(1785,735,185,64,1.0f,.5f);
-  cloud(2020,670,184);cloud(2240,585,180,58,.84f,1.1f);
+  // Sem a nuvem intermediaria (1128): a travessia de uma movel para outra
+  // exige mais atencao, mas continua dentro do alcance do salto de Laura.
+  cloud(1340,726,175,62,.9f,1.2f);
+  cloud(1560,779,177);cloud(1785,727,185,64,1.0f,.5f);
+  cloud(2020,664,184);cloud(2240,581,180,58,.84f,1.1f);
   cloud(2430,488,174);cloud(2560,450,170);
   // Saida da arvore por uma nuvem movel, sentido Autoescola.
   cloud(3038,407,174,58,.78f,.3f);
@@ -114,6 +117,7 @@ struct Level2 {
   x=385;feet=L2_GROUND;vy=0;camX=0;camY=845;clock=0;runClock=0;
   jumpElapsed=0;dropTimer=0;peakFeet=L2_GROUND;fade=0;fadeState=0;
   interaction=0;interactionTimer=0;grounded=true;faceLeft=false;collected=false;finished=false;
+  cloudCameraActive=false;cloudCameraDone=false;
   // Reposiciona nuvens moveis para uma nova tentativa.
   for(auto&c:clouds)c.r.x=c.origin+c.amplitude*std::sin(c.phase);
  }
@@ -245,11 +249,23 @@ struct Level2 {
   if(feet>1810){die(audio,mix,false);return;}
   if(grounded&&std::fabs(axis)>.15f)runClock+=dt*11;else runClock=0;
   camX+=(std::max(0.f,std::min(L2_W-SW,x-420))-camX)*std::min(1.f,dt*5.5f);
+  // Camera das nuvens: habilita ao alcancar a primeira nuvem e continua
+  // estavel nos saltos e nas quedas, sem alternar enquadramento pelo sinal de vy.
+  if(!cloudCameraDone && !cloudCameraActive && x>100 && x<430 &&
+     feet<799 && feet>690){cloudCameraActive=true;}
+  // Passou da cobertura da Autoescola: volta ao enquadramento da vila.
+  if(cloudCameraActive && x>3510 && feet>520){
+   cloudCameraActive=false;cloudCameraDone=true;
+  }
   if(!inPit&&!(inWater&&feet>L2_GROUND)){
-   // Na descida mostra mais area INFERIOR; na subida revela nuvens superiores.
-   bool descendingClouds=(x>2990&&feet<1450)||(vy>110&&feet<1200);
-   float desired=feet-(descendingClouds?278.f:(feet>1190&&x<1510?645.f:510.f));
-   camY+=(std::max(0.f,std::min(1120.f,desired))-camY)*std::min(1.f,dt*4.2f);
+   // Sprite tem altura ~85: posicao do centro do corpo, nao dos pes.
+   float desired=cloudCameraActive ? feet-(SH*.5f+42.f)
+                                   : feet-(feet>1190&&x<1510?645.f:510.f);
+   float minY=cloudCameraActive?-115.f:0.f;
+   desired=std::max(minY,std::min(1120.f,desired));
+   // Em modo nuvens acompanha a Laura sem mudancas repentinas de modo na queda.
+   float speed=cloudCameraActive?11.5f:4.2f;
+   camY+=(desired-camY)*std::min(1.f,dt*speed);
   }
  }
  void render(SDL_Renderer*r,SDL_Texture* mom[6],SDL_Texture* laura[18],const FrameData* frames[18])const{

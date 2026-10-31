@@ -1,0 +1,39 @@
+LAURA ADVENTURE - FASE 2 REVISAO 04 - CAMERA, BGM E MENU DE PAUSA
+Destino: GitHub -> branch fase-2. NAO enviar para main.
+
+NOVIDADES
+1. Nova BGM original da Fase 2: Laura's Cloud Hop - Demo 02 (mix equilibrada).
+   - Embutida em source/lauras_cloud_hop.h (24 kHz, PCM 8 bits mono).
+   - Abertura continua com Laura's Sunset; Fase 1 continua com Laura's Theme.
+   - Na Fase 2, a nova BGM toca em loop; pausa e retoma do ponto anterior.
+   - Musica de vitoria e efeitos sonoros anteriores preservados.
+2. Camera: modo "nuvens" ativado ao entrar na primeira nuvem, mantendo
+   a Laura proxima do centro vertical da tela, sem alternar ao subir/cair.
+   A camera volta suavemente ao enquadramento comum depois da Autoescola.
+   O modo se reinicia ao reiniciar a fase.
+3. Botao - (Minus): fecha Laura Adventure em qualquer tela com limpeza SDL.
+4. Botao + (Plus): pausa e abre menu com CONTINUAR e TELA INICIAL.
+   - Cima/Baixo: selecionar; A: confirmar; B ou +: continuar.
+   - TELA INICIAL reinicia os estados e devolve a trilha da abertura.
+   - As duas fases usam o mesmo menu de pausa.
+5. Nuvenzinhas: removida uma nuvem intermediaria do trecho sobre a agua.
+   Outras nuvens tiveram alturas levemente ajustadas para variar a travessia.
+   Foram mantidas as 3 nuvens iniciais e as 3 de descida no consultorio.
+
+COMO TESTAR
+1. Extrair o ZIP e enviar os arquivos para a branch 'fase-2'.
+2. GitHub Actions > Laura Adventure - Nintendo Switch > Run workflow > fase-2.
+3. Baixar o artefato da NOVA execucao e substituir o NRO no Switch.
+4. Na tela inicial, X inicia diretamente a Fase 2 (atalho de teste).
+5. Na primeira nuvem, verifique se a Laura fica na area central da tela.
+6. Durante saltos e quedas nas nuvens, confirme a camera sem solavancos.
+7. Passando o telhado da Autoescola, confirme retorno suave da camera.
+8. Ouvir Laura's Cloud Hop; testar pausa, retorno ao titulo e botao -.
+9. Verificar a travessia mais dificil depois de remover uma nuvem.
+10. Verificar que a Fase 1 continua normal e a musica dela nao mudou.
+
+VALIDACAO REALIZADA
+- Sintaxe C++ conferida localmente por g++17 com cabecalhos simulados.
+- Verificado alcance geometrico aproximado no salto entre nuvens moveis.
+- ZIP verificado quanto a integridade.
+- Nao foi possivel executar devkitPro nem testar o Nintendo Switch aqui.
