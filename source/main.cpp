@@ -14,6 +14,7 @@
 #include "lauras_sunset.h"
 #include "lauras_cloud_hop.h"
 #include "title_art.h"
+#include "pause_assets_generated.h"
 
 constexpr int SW=1280, SH=720;
 constexpr float WORLD=5650.0f, GROUND=615.0f;
@@ -163,33 +164,51 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
 }
 #include "level2.h"
 // Pause menu shared by both stages; warm colors echo the title screen.
-static void pauseMenu(SDL_Renderer* r,int selection,bool bgmEnabled){
- SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
- SDL_SetRenderDrawColor(r,13,25,45,182);
- SDL_Rect veil{0,0,SW,SH};SDL_RenderFillRect(r,&veil);
- SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
- fill(r,324,96,632,538,32,66,90);
- fill(r,334,106,612,518,247,213,151);
- fill(r,344,116,592,498,87,140,155);
- fill(r,355,128,570,474,47,91,121);
- fill(r,368,142,544,74,32,72,104);
- label(r,"LAURA ADVENTURE",408,163,5,255,232,182,0);
- label(r,"PAUSADO",543,237,4,255,233,187,0);
- for(int i=0;i<4;++i){
-  const bool selected=selection==i;
-  const int y=282+i*67;
-  fill(r,386,y,508,55,selected?255:70,selected?214:129,selected?153:148);
-  fill(r,393,y+6,494,43,selected?255:91,selected?237:158,selected?197:173);
-  const char* name=i==0?"CONTINUAR":i==1?"REINICIAR FASE":i==2?
-    (bgmEnabled?"BGM: LIGADA":"BGM: DESLIGADA"):"MENU PRINCIPAL";
-  const int scale=3;
-  const int width=int(std::strlen(name))*6*scale;
-  label(r,name,640-width/2,y+14,scale,selected?42:237,selected?70:242,selected?82:220,0);
+static SDL_Texture* pauseTextures[12]{};
+static void initPauseTextures(SDL_Renderer* r){
+ for(int i=0;i<12;i++){
+  const PauseAsset& a=*pause_assets[i];
+  SDL_Surface* surf=SDL_CreateRGBSurfaceWithFormat(0,a.w,a.h,32,SDL_PIXELFORMAT_RGBA8888);
+  if(!surf)continue;
+  Uint32* pixels=(Uint32*)surf->pixels;size_t pos=0;
+  for(int j=0;j<a.count;j++){
+   const PauseRun& run=a.runs[j];
+   Uint32 c=SDL_MapRGBA(surf->format,Uint8(run.rgba>>24),Uint8(run.rgba>>16),Uint8(run.rgba>>8),Uint8(run.rgba));
+   for(uint32_t k=0;k<run.count;k++)pixels[pos++]=c;
+  }
+  pauseTextures[i]=SDL_CreateTextureFromSurface(r,surf);SDL_FreeSurface(surf);
+  if(pauseTextures[i])SDL_SetTextureBlendMode(pauseTextures[i],SDL_BLENDMODE_BLEND);
  }
- // Short control hints centered inside the panel, with safe side margins.
- label(r,"D-PAD: MOVER",394,577,2,247,228,192,0);
- label(r,"A: OK",580,577,2,247,228,192,0);
- label(r,"B/+: VOLTAR",692,577,2,247,228,192,0);
+}
+static void pauseSprite(SDL_Renderer* r,int id,int x,int y,int w,int h){
+ if(id<0||id>=12||!pauseTextures[id])return;
+ SDL_Rect dst{x,y,w,h};SDL_RenderCopy(r,pauseTextures[id],nullptr,&dst);
+}
+static void pauseMenu(SDL_Renderer* r,int selection,bool bgmEnabled){
+ // The gameplay remains visible beneath a translucent rose veil.
+ SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
+ SDL_SetRenderDrawColor(r,222,112,172,145);
+ SDL_Rect screen{0,0,SW,SH};SDL_RenderFillRect(r,&screen);
+ SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
+ // Layered artwork: border, title, characters and independent interactive buttons.
+ pauseSprite(r,5,260,54,760,610);
+ pauseSprite(r,0,390,76,500,135);
+ pauseSprite(r,1,492,195,296,86);
+ pauseSprite(r,2,178,385,250,198);
+ pauseSprite(r,4,888,429,207,178);
+ for(int i=0;i<4;i++){
+  int y=280+i*72;
+  pauseSprite(r,selection==i?6:7,422,y,436,67);
+  pauseSprite(r,8+i,447,y+12,44,42);
+  const char* name=i==0?"CONTINUAR":i==1?"REINICIAR FASE":i==2?
+   (bgmEnabled?"BGM: LIGADA":"BGM: DESLIGADA"):"MENU PRINCIPAL";
+  const int scale=3;int width=int(std::strlen(name))*6*scale;
+  label(r,name,650-width/2,y+21,scale,selection==i?77:255,selection==i?49:245,selection==i?94:233,0);
+ }
+ // Compact hints, safely within the panel.
+ label(r,"D-PAD: MOVER",428,598,2,255,246,225,0);
+ label(r,"A: OK",604,598,2,255,246,225,0);
+ label(r,"B/+: VOLTAR",703,598,2,255,246,225,0);
 }
 
 int main(int,char**){
@@ -199,6 +218,7 @@ int main(int,char**){
  SDL_Renderer* r=SDL_CreateRenderer(win,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
  if(!r){SDL_DestroyWindow(win);SDL_Quit();return 3;}
+ initPauseTextures(r);
  auto loadFrame=[&](const FrameData& frame)->SDL_Texture*{
   SDL_Surface* s=SDL_CreateRGBSurfaceWithFormat(0,frame.w,frame.h,32,SDL_PIXELFORMAT_RGBA8888);if(!s)return nullptr;
   SDL_LockSurface(s);Uint32* px=(Uint32*)s->pixels;int pos=0;
@@ -468,5 +488,5 @@ int main(int,char**){
   if(paused)pauseMenu(r,pauseChoice,bgmEnabled);
   SDL_RenderPresent(r);
  }
- if(audio)SDL_CloseAudioDevice(audio);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
+ if(audio)SDL_CloseAudioDevice(audio);for(auto&t:pauseTextures)if(t)SDL_DestroyTexture(t);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
 }
