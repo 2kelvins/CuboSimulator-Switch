@@ -15,6 +15,7 @@
 #include "lauras_cloud_hop.h"
 #include "title_art.h"
 #include "pause_assets_generated.h"
+#include "complete_assets_generated.h"
 
 constexpr int SW=1280, SH=720;
 constexpr float WORLD=5650.0f, GROUND=615.0f;
@@ -211,6 +212,50 @@ static void pauseMenu(SDL_Renderer* r,int selection,bool bgmEnabled){
  label(r,"B/+: VOLTAR",703,598,2,255,246,225,0);
 }
 
+static SDL_Texture* completeTextures[13]{};
+static void initCompleteTextures(SDL_Renderer* r){
+ for(int i=0;i<13;i++){
+  const CompleteAsset& a=*complete_assets[i];
+  SDL_Surface* surf=SDL_CreateRGBSurfaceWithFormat(0,a.w,a.h,32,SDL_PIXELFORMAT_RGBA8888);
+  if(!surf)continue;
+  Uint32* pixels=(Uint32*)surf->pixels;size_t pos=0;
+  for(int j=0;j<a.count;j++){
+   const CompleteRun& run=a.runs[j];
+   Uint32 c=SDL_MapRGBA(surf->format,Uint8(run.rgba>>24),Uint8(run.rgba>>16),Uint8(run.rgba>>8),Uint8(run.rgba));
+   for(uint32_t k=0;k<run.count;k++)pixels[pos++]=c;
+  }
+  completeTextures[i]=SDL_CreateTextureFromSurface(r,surf);SDL_FreeSurface(surf);
+  if(completeTextures[i])SDL_SetTextureBlendMode(completeTextures[i],SDL_BLENDMODE_BLEND);
+ }
+}
+static void completeSprite(SDL_Renderer*r,int i,int x,int y,int w,int h){
+ if(i<0||i>=13||!completeTextures[i])return;
+ SDL_Rect dst{x,y,w,h};SDL_RenderCopy(r,completeTextures[i],nullptr,&dst);
+}
+static void completeMenu(SDL_Renderer*r,int stage,int choice){
+ SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
+ SDL_SetRenderDrawColor(r,224,114,185,138);
+ SDL_Rect screen{0,0,SW,SH};SDL_RenderFillRect(r,&screen);
+ SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
+ completeSprite(r,8,258,47,764,622);
+ completeSprite(r,0,421,61,438,123);
+ completeSprite(r,1,368,180,544,95);
+ completeSprite(r,12,389,277,503,49);
+ const char* msg=stage==1?"LAURA CHEGOU A ESCOLA":"LAURA ENCONTROU A MAMAE";
+ int scale=3;int width=int(std::strlen(msg))*6*scale;
+ label(r,msg,640-width/2,291,scale,75,34,119,0);
+ for(int i=0;i<2;i++){
+  int y=357+i*87;
+  completeSprite(r,(i==0?(choice==0?2:3):(choice==1?4:5)),403,y,474,81);
+  const char* txt=i==0?"REINICIAR":"PROXIMO NIVEL";
+  int tw=int(std::strlen(txt))*6*3;
+  label(r,txt,660-tw/2,y+26,3,choice==i?75:255,choice==i?35:250,choice==i?90:245,0);
+ }
+ completeSprite(r,6,178,421,249,227);
+ completeSprite(r,7,843,444,224,169);
+ label(r,"D-PAD: ESCOLHER   A: CONFIRMAR",397,614,2,255,243,224,0);
+}
+
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
  SDL_Window* win=SDL_CreateWindow("Laura Adventure 1.2.1 - Fase 2",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,SW,SH,SDL_WINDOW_SHOWN);
@@ -219,6 +264,7 @@ int main(int,char**){
  if(!r)r=SDL_CreateRenderer(win,-1,SDL_RENDERER_SOFTWARE);
  if(!r){SDL_DestroyWindow(win);SDL_Quit();return 3;}
  initPauseTextures(r);
+ initCompleteTextures(r);
  auto loadFrame=[&](const FrameData& frame)->SDL_Texture*{
   SDL_Surface* s=SDL_CreateRGBSurfaceWithFormat(0,frame.w,frame.h,32,SDL_PIXELFORMAT_RGBA8888);if(!s)return nullptr;
   SDL_LockSurface(s);Uint32* px=(Uint32*)s->pixels;int pos=0;
@@ -362,6 +408,7 @@ int main(int,char**){
     }
    }
    level2.render(r,mom,anim,frames);
+   if(level2.finished)completeMenu(r,2,menuChoice);
    if(paused)pauseMenu(r,pauseChoice,bgmEnabled);
    SDL_RenderPresent(r);
    continue;
@@ -473,20 +520,10 @@ int main(int,char**){
   if(selected==15)SDL_SetTextureColorMod(anim[selected],255,174,174);
   SDL_RenderCopyEx(r,anim[selected],nullptr,&dest,0,nullptr,facingLeft?SDL_FLIP_HORIZONTAL:SDL_FLIP_NONE);
   if(selected==15)SDL_SetTextureColorMod(anim[selected],255,255,255);
-  if(finished){
-   fill(r,265,184,750,340,27,75,67);
-   fill(r,277,196,726,316,48,108,93);
-   label(r,"MISSAO CONCLUIDA",326,228,5,250,233,180,0);
-   label(r,"LAURA CHEGOU A ESCOLA",348,302,3,250,233,180,0);
-   fill(r,345,367,590,48,menuChoice==0?229:70,menuChoice==0?196:113,menuChoice==0?114:102);
-   label(r,"REINICIAR",474,377,4,menuChoice==0?36:217,menuChoice==0?67:230,menuChoice==0?59:209,0);
-   fill(r,345,430,590,48,menuChoice==1?105:67,menuChoice==1?117:92,menuChoice==1?109:86);
-   label(r,"PROXIMO NIVEL",405,441,3,menuChoice==1?251:182,menuChoice==1?239:193,menuChoice==1?183:167,0);
-   // Fase 2 agora selecionavel; nao mostrar cadeado.
-  }
+  if(finished)completeMenu(r,1,menuChoice);
   if(fade>0){SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));SDL_Rect full{0,0,SW,SH};SDL_RenderFillRect(r,&full);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);}
   if(paused)pauseMenu(r,pauseChoice,bgmEnabled);
   SDL_RenderPresent(r);
  }
- if(audio)SDL_CloseAudioDevice(audio);for(auto&t:pauseTextures)if(t)SDL_DestroyTexture(t);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
+ if(audio)SDL_CloseAudioDevice(audio);for(auto&t:pauseTextures)if(t)SDL_DestroyTexture(t);for(auto&t:completeTextures)if(t)SDL_DestroyTexture(t);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
 }
