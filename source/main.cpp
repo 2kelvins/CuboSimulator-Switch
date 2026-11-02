@@ -359,7 +359,7 @@ int main(int,char**){
    titleTime+=dt;
    if(down&(HidNpadButton_A|HidNpadButton_B|HidNpadButton_Plus|HidNpadButton_X)){
     titleScreen=false;stage2=(down&HidNpadButton_X)!=0;
-    reset();if(stage2){level2.reset();setMusic(2,true);}
+    reset();if(stage2){level2.reset();menuChoice=0;setMusic(2,true);}
     down=0; // Nao reutilizar Start como comando no mesmo quadro.
    }
    // Arte original enviada pelo usuario: exibida integralmente.
@@ -398,9 +398,12 @@ int main(int,char**){
   // X na tela inicial abre diretamente a fase 2 para testes da branch.
   if(stage2){
    if(!paused){
-    if(level2.finished&&(down&HidNpadButton_X)){
-     level2.reset();
-     setMusic(2,true);
+    if(level2.finished){
+     if(down&(HidNpadButton_Up|HidNpadButton_Down))menuChoice=1-menuChoice;
+     if(down&(HidNpadButton_A|HidNpadButton_B|HidNpadButton_X)){
+      if(menuChoice==0){level2.reset();setMusic(2,true);}
+      else{goTitle();continue;} // No third stage yet; return to title.
+     }
     }else{
      HidAnalogStickState s2Stick=padGetStickPos(&pad,0);
      float axis=float(s2Stick.x)/32767.f;
@@ -423,7 +426,7 @@ int main(int,char**){
    if(down&(HidNpadButton_A|HidNpadButton_B)){
     if(menuChoice==0)reset();
     else{
-     stage2=true;level2.reset();setMusic(2,true);
+     stage2=true;level2.reset();menuChoice=0;setMusic(2,true);
     }
    }
   }
