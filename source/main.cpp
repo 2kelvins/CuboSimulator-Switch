@@ -186,7 +186,10 @@ static void pauseMenu(SDL_Renderer* r,int selection,bool bgmEnabled){
   const int width=int(std::strlen(name))*6*scale;
   label(r,name,640-width/2,y+14,scale,selected?42:237,selected?70:242,selected?82:220,0);
  }
- label(r,"DIRECIONAL: ESCOLHER   A: CONFIRMAR   B/+: VOLTAR",390,577,2,247,228,192,0);
+ // Short control hints centered inside the panel, with safe side margins.
+ label(r,"D-PAD: MOVER",394,577,2,247,228,192,0);
+ label(r,"A: OK",580,577,2,247,228,192,0);
+ label(r,"B/+: VOLTAR",692,577,2,247,228,192,0);
 }
 
 int main(int,char**){
