@@ -162,27 +162,32 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  if(!collected)rabbit(r,780,240,int(cam));
 }
 #include "level2.h"
-// Pause menu shared by both stages. D-pad to select; A to confirm; + or B resumes.
-static void pauseMenu(SDL_Renderer* r,int selection){
+// Pause menu shared by both stages; warm colors echo the title screen.
+static void pauseMenu(SDL_Renderer* r,int selection,bool bgmEnabled){
  SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
- SDL_SetRenderDrawColor(r,8,16,32,170);
+ SDL_SetRenderDrawColor(r,13,25,45,182);
  SDL_Rect veil{0,0,SW,SH};SDL_RenderFillRect(r,&veil);
  SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);
- fill(r,344,199,592,327,29,55,78);
- fill(r,354,209,572,307,53,96,116);
- fill(r,365,222,550,69,30,71,91);
- label(r,"PAUSE",485,231,11,255,233,177,0);
- for(int i=0;i<2;++i){
-  bool selected=selection==i;
-  int y=316+i*79;
-  fill(r,395,y,490,62,selected?245:62,selected?209:118,selected?151:128);
-  fill(r,405,y+6,470,50,selected?254:74,selected?232:145,selected?185:154);
-  if(i==0)label(r,"CONTINUAR",516,y+17,5,selected?44:228,selected?77:240,selected?88:221,0);
-  else label(r,"TELA INICIAL",480,y+17,4,selected?44:228,selected?77:240,selected?88:221,0);
+ fill(r,324,96,632,538,32,66,90);
+ fill(r,334,106,612,518,247,213,151);
+ fill(r,344,116,592,498,87,140,155);
+ fill(r,355,128,570,474,47,91,121);
+ fill(r,368,142,544,74,32,72,104);
+ label(r,"LAURA ADVENTURE",408,163,5,255,232,182,0);
+ label(r,"PAUSADO",543,237,4,255,233,187,0);
+ for(int i=0;i<4;++i){
+  const bool selected=selection==i;
+  const int y=282+i*67;
+  fill(r,386,y,508,55,selected?255:70,selected?214:129,selected?153:148);
+  fill(r,393,y+6,494,43,selected?255:91,selected?237:158,selected?197:173);
+  const char* name=i==0?"CONTINUAR":i==1?"REINICIAR FASE":i==2?
+    (bgmEnabled?"BGM: LIGADA":"BGM: DESLIGADA"):"MENU PRINCIPAL";
+  const int scale=3;
+  const int width=int(std::strlen(name))*6*scale;
+  label(r,name,640-width/2,y+14,scale,selected?42:237,selected?70:242,selected?82:220,0);
  }
- label(r,"MAIS: VOLTAR    MENOS: SAIR",405,489,2,232,226,212,0);
+ label(r,"DIRECIONAL: ESCOLHER   A: CONFIRMAR   B/+: VOLTAR",390,577,2,247,228,192,0);
 }
-
 
 int main(int,char**){
  if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_GAMECONTROLLER)!=0)return 1;
@@ -259,10 +264,11 @@ int main(int,char**){
  float x=530,y=GROUND-35,vy=0,cam=0,runClock=0,jumpElapsed=0,landTimer=0,hurtTimer=0,fade=0,worldTime=0,peakFeet=GROUND,dropTimer=0;
  bool titleScreen=true;bool paused=false;int pauseChoice=0;float titleTime=0;bool grounded=true,facingLeft=false,collected=false,finished=false;int fadeState=0;bool running=true;int menuChoice=0;
  Uint64 prev=SDL_GetPerformanceCounter();double freq=double(SDL_GetPerformanceFrequency());
+ bool bgmEnabled=true;
  auto setMusic=[&](int track,bool restart,bool playing=true){
   if(audio){SDL_LockAudioDevice(audio);mix.musicTrack=track;
    if(restart)mix.musicPos=0;
-   mix.musicPlaying=playing;SDL_UnlockAudioDevice(audio);}
+   mix.musicPlaying=playing && bgmEnabled;SDL_UnlockAudioDevice(audio);}
  };
  auto reset=[&](){x=530;y=GROUND-35;vy=0;grounded=true;collected=false;finished=false;cam=0;landTimer=hurtTimer=jumpElapsed=dropTimer=0;menuChoice=0;worldTime=0;setMusic(1,true);};
  auto goTitle=[&](){
@@ -270,7 +276,7 @@ int main(int,char**){
   reset();level2.reset();stage2=false;titleScreen=true;paused=false;pauseChoice=0;titleTime=0;fade=0;fadeState=0;
   if(audio){SDL_LockAudioDevice(audio);
    for(auto&v:mix.voices)v=Voice{};
-   mix.musicTrack=0;mix.musicPos=0;mix.musicPlaying=true;
+   mix.musicTrack=0;mix.musicPos=0;mix.musicPlaying=bgmEnabled;
    SDL_UnlockAudioDevice(audio);}
  };
  while(appletMainLoop()&&running){
@@ -300,11 +306,23 @@ int main(int,char**){
    down=0; // Do not let the same button also act on the game/menu.
   }
   if(paused){
-   if(down&(HidNpadButton_Up|HidNpadButton_Down))pauseChoice=1-pauseChoice;
+   if(down&HidNpadButton_Up)pauseChoice=(pauseChoice+3)%4;
+   if(down&HidNpadButton_Down)pauseChoice=(pauseChoice+1)%4;
    if(down&HidNpadButton_B){paused=false;setMusic(stage2?2:1,false,stage2?!level2.finished:!finished);down=0;}
    else if(down&HidNpadButton_A){
-    if(pauseChoice==1){goTitle();continue;}
-    paused=false;setMusic(stage2?2:1,false,stage2?!level2.finished:!finished);down=0;
+    if(pauseChoice==3){goTitle();continue;}
+    if(pauseChoice==2){
+     bgmEnabled=!bgmEnabled;
+     setMusic(stage2?2:1,false,false);
+     down=0;
+    }else if(pauseChoice==1){
+     if(stage2)level2.reset();
+     else reset();
+     paused=false;pauseChoice=0;
+     setMusic(stage2?2:1,true,true);down=0;
+    }else{
+     paused=false;setMusic(stage2?2:1,false,stage2?!level2.finished:!finished);down=0;
+    }
    }
   }
   // A segunda fase tem camera vertical, mapa, colisao e HUD independentes.
@@ -321,7 +339,7 @@ int main(int,char**){
     }
    }
    level2.render(r,mom,anim,frames);
-   if(paused)pauseMenu(r,pauseChoice);
+   if(paused)pauseMenu(r,pauseChoice,bgmEnabled);
    SDL_RenderPresent(r);
    continue;
   }
@@ -444,7 +462,7 @@ int main(int,char**){
    // Fase 2 agora selecionavel; nao mostrar cadeado.
   }
   if(fade>0){SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));SDL_Rect full{0,0,SW,SH};SDL_RenderFillRect(r,&full);SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_NONE);}
-  if(paused)pauseMenu(r,pauseChoice);
+  if(paused)pauseMenu(r,pauseChoice,bgmEnabled);
   SDL_RenderPresent(r);
  }
  if(audio)SDL_CloseAudioDevice(audio);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
