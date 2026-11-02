@@ -393,13 +393,6 @@ struct Level2 {
    if(interaction==1)l2label(r,"MAMAE",490,590,6,255,235,193,0,0);
    else l2label(r,"MUITO BEM LAURA",335,591,5,255,234,197,0,0);
   }
-  if(finished){
-   l2box(r,255,190,770,330,30,83,80,0,0);
-   l2box(r,269,204,742,303,66,143,124,0,0);
-   l2label(r,"MISSAO CONCLUIDA",300,257,6,255,235,179,0,0);
-   l2label(r,"MAMAE ESTA FELIZ",340,350,4,255,248,218,0,0);
-   l2label(r,"APERTE X PARA REINICIAR",323,443,3,252,246,211,0,0);
-  }
   if(fade>0){
    SDL_SetRenderDrawBlendMode(r,SDL_BLENDMODE_BLEND);
    SDL_SetRenderDrawColor(r,0,0,0,Uint8(fade*255));
