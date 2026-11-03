@@ -139,7 +139,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  // Predios de condominio (0.25x)
  for(int i=0;i<23;i++){int px=i*265-int(cam*.25f);int top=250+(i%4)*21;fill(r,px,top,110,GROUND-top,196,184,161);for(int j=0;j<3;j++)for(int k=0;k<4;k++)fill(r,px+14+j*32,top+30+k*54,15,24,99,125,138);}
  // Casas e arvores no plano medio (0.43x)
- for(int i=0;i<34;i++){int px=i*175-int(cam*.43f);fill(r,px,400+(i%3)*14,118,GROUND-(400+(i%3)*14),204,167,134);fill(r,px-8,389+(i%3)*14,132,17,152,79,62);textureFill(r,4,px-8,389+(i%3)*14,132,17,0);
+ for(int i=0;i<34;i++){int px=i*175-int(cam*.43f);fill(r,px,400+(i%3)*14,118,GROUND-(400+(i%3)*14),204,167,134);fill(r,px-8,389+(i%3)*14,132,17,152,79,62);// Background roofs use their original solid shading to avoid texture swimming during parallax.
   fill(r,px+137,390,9,GROUND-390,93,67,46);fill(r,px+103,344,76,55,58,122,74);fill(r,px+114,327,53,45,72,137,80);}
  // Vila
  building(r,0,312,460,303,88,144,143,int(cam));building(r,460,310,585,305,206,164,111,int(cam));
