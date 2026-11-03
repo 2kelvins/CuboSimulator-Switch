@@ -154,9 +154,9 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  for(int i=0;i<26;i++){fill(r,i*42,299+(i%2)*3,40,14,144+(i%3)*12,68,51,int(cam));textureFill(r,4,i*42,299+(i%2)*3,40,14,int(cam));}
  // Rua e muros de casas
  building(r,1270,277,320,338,180,157,133,int(cam));building(r,1680,335,430,280,191,166,137,int(cam));
- fill(r,1490,427,590,188,146,137,120,int(cam));textureFill(r,5,1490,427,590,188,int(cam));for(int i=0;i<16;i++)fill(r,1495+i*36,438+(i%3)*11,24,3,117,108,96,int(cam));
+ fill(r,1490,427,590,188,116,110,108,int(cam));textureFill(r,5,1490,427,590,188,int(cam));for(int i=0;i<16;i++)fill(r,1495+i*36,438+(i%3)*11,24,3,117,108,96,int(cam));
  // Muro de separacao: chega ate o solo e bloqueia acesso lateral ao corrego.
- fill(r,2110,430,210,185,140,132,113,int(cam));textureFill(r,5,2110,430,210,185,int(cam));
+ fill(r,2110,430,210,185,111,108,110,int(cam));textureFill(r,5,2110,430,210,185,int(cam));
  fill(r,2110,425,210,12,187,174,147,int(cam));
  for(int i=0;i<5;i++)fill(r,2120+i*40,470+(i%2)*24,26,4,111,105,91,int(cam));
  // grade: vazada, NAO e solida
@@ -167,7 +167,17 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  ground(0,2320,615);ground(2660,3170,615);ground(4510,5650,615);
  // agua dos dois corregos
  for(int n=0;n<2;n++){int a=n==0?2320:3170,b=n==0?2660:4510;
-  fill(r,a,618,b-a,SH-618,53,101,77,int(cam));for(int i=a;i<b;i+=45){int wig=int(3*std::sin(time*2+i*.08));fill(r,i,624+wig,25,3,119,157,114,int(cam));}
+  fill(r,a,650,b-a,SH-650,24,95,116,int(cam));
+  // Exposed canal walls and dark gray coping below the pavement.
+  fill(r,a,615,14,35,70,68,73,int(cam));fill(r,b-14,615,14,35,70,68,73,int(cam));
+  for(int yy=619;yy<648;yy+=11){fill(r,a,yy,14,2,112,108,110,int(cam));fill(r,b-14,yy,14,2,112,108,110,int(cam));}
+  fill(r,a,650,b-a,5,67,176,191,int(cam));
+  for(int yy=664;yy<SH;yy+=22)for(int xx=a+12;xx<b-12;xx+=58){
+   int phase=int(4*std::sin(time*1.8f+xx*.045f+yy*.03f));
+   fill(r,xx+phase,yy,25,3,35,125,150,int(cam));
+   fill(r,xx+phase+8,yy+5,13,2,111,201,211,int(cam));
+  }
+  for(int xx=a+8;xx<b-20;xx+=43){int wave=int(3*std::sin(time*2.2f+xx*.065f));fill(r,xx,652+wave,23,2,164,224,222,int(cam));}
  }
  // Jacare animado: corpo ondulante, cauda, patas, focinho, dentes e olho.
  float crocX=3730+145*std::sin(time*.72f), bob=3*std::sin(time*2.8f);
@@ -498,6 +508,9 @@ int main(int,char**){
     }else sideBlock(p);
    }
    sideBlock(schoolBase);
+   // Collision faces between pavement and the lowered water surface.
+   const Rect canalBanks[4]={{2308,615,12,35},{2660,615,12,35},{3158,615,12,35},{4510,615,12,35}};
+   for(const auto& bank:canalBanks)sideBlock(bank);
    x=nextX;
    if(!grounded){vy=std::min(1050.f,vy+1500.f*(vy>0?1.18f:1.f)*dt);y+=vy*dt;jumpElapsed+=dt;peakFeet=std::min(peakFeet,y+35);}
    bool landed=false;float landedY=GROUND;bool onMoving=false;int movingIndex=-1;
@@ -538,8 +551,8 @@ int main(int,char**){
    }
    if(!collected&&std::fabs(x-804)<65&&std::fabs((y-35)-270)<80){collected=true;play(audio,mix,sfx_healed1,sfx_healed1_count,.75f);}
    // Agua causa falha, jacare apenas visual
-   bool water=((x>=2320&&x<2660)||(x>=3170&&x<4510));
-   if(water&&y+35>=618){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
+   bool water=((x+20>2320&&x-20<2660)||(x+20>3170&&x-20<4510));
+   if(water&&y+35>=650){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
    // A porta exige Y, como a interacao da fase 2. O coelho continua obrigatorio.
    if(collected && (down&HidNpadButton_Y) && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=380){
     finished=true;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=false;SDL_UnlockAudioDevice(audio);}play(audio,mix,sfx_complete,sfx_complete_count,.85f);
