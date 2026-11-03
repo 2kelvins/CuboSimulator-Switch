@@ -167,17 +167,17 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  ground(0,2320,615);ground(2660,3170,615);ground(4510,5650,615);
  // agua dos dois corregos
  for(int n=0;n<2;n++){int a=n==0?2320:3170,b=n==0?2660:4510;
-  fill(r,a,650,b-a,SH-650,24,95,116,int(cam));
+  fill(r,a,635,b-a,SH-635,53,101,77,int(cam));
   // Exposed canal walls and dark gray coping below the pavement.
-  fill(r,a,615,14,35,70,68,73,int(cam));fill(r,b-14,615,14,35,70,68,73,int(cam));
-  for(int yy=619;yy<648;yy+=11){fill(r,a,yy,14,2,112,108,110,int(cam));fill(r,b-14,yy,14,2,112,108,110,int(cam));}
-  fill(r,a,650,b-a,5,67,176,191,int(cam));
-  for(int yy=664;yy<SH;yy+=22)for(int xx=a+12;xx<b-12;xx+=58){
+  fill(r,a,615,14,20,70,68,73,int(cam));fill(r,b-14,615,14,20,70,68,73,int(cam));
+  for(int yy=619;yy<634;yy+=11){fill(r,a,yy,14,2,112,108,110,int(cam));fill(r,b-14,yy,14,2,112,108,110,int(cam));}
+  fill(r,a,635,b-a,5,92,153,105,int(cam));
+  for(int yy=649;yy<SH;yy+=22)for(int xx=a+12;xx<b-12;xx+=58){
    int phase=int(4*std::sin(time*1.8f+xx*.045f+yy*.03f));
-   fill(r,xx+phase,yy,25,3,35,125,150,int(cam));
-   fill(r,xx+phase+8,yy+5,13,2,111,201,211,int(cam));
+   fill(r,xx+phase,yy,25,3,65,126,83,int(cam));
+   fill(r,xx+phase+8,yy+5,13,2,139,183,115,int(cam));
   }
-  for(int xx=a+8;xx<b-20;xx+=43){int wave=int(3*std::sin(time*2.2f+xx*.065f));fill(r,xx,652+wave,23,2,164,224,222,int(cam));}
+  for(int xx=a+8;xx<b-20;xx+=43){int wave=int(3*std::sin(time*2.2f+xx*.065f));fill(r,xx,637+wave,23,2,168,204,143,int(cam));}
  }
  // Crocodile: shaded pixel-art silhouette with animated tail, scales and eyes.
  float crocX=3730+145*std::sin(time*.72f), bob=3*std::sin(time*2.8f);
@@ -226,6 +226,9 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  // arco iris simplificado em faixas
  for(int i=0;i<5;i++){Uint8 cols[5][3]={{220,86,80},{230,161,70},{220,208,84},{95,175,111},{96,137,204}};fill(r,5200+i*11,190+i*8,275-i*22,8,cols[i][0],cols[i][1],cols[i][2],int(cam));}
  label(r,"ESCOLA ARCO-IRIS",5120,264,3,239,244,220,int(cam));fill(r,5270,286,112,84,35,80,69,int(cam));fill(r,5321,286,5,84,181,204,187,int(cam));
+ // Neutral cap over the bright fascia at the tops of the long brick walls.
+ fill(r,1490,418,590,13,66,69,75,int(cam));
+ fill(r,2110,421,210,13,66,69,75,int(cam));
  // Caixas e superficie do muro; telhados usam a propria arte das construcoes.
  for(const auto& b:blocks){
   // Dark graphite coping on top of solid masonry walls, not terracotta roof red.
@@ -535,7 +538,7 @@ int main(int,char**){
    }
    sideBlock(schoolBase);
    // Collision faces between pavement and the lowered water surface.
-   const Rect canalBanks[4]={{2308,615,12,35},{2660,615,12,35},{3158,615,12,35},{4510,615,12,35}};
+   const Rect canalBanks[4]={{2308,615,12,20},{2660,615,12,20},{3158,615,12,20},{4510,615,12,20}};
    for(const auto& bank:canalBanks)sideBlock(bank);
    x=nextX;
    if(!grounded){vy=std::min(1050.f,vy+1500.f*(vy>0?1.18f:1.f)*dt);y+=vy*dt;jumpElapsed+=dt;peakFeet=std::min(peakFeet,y+35);}
@@ -578,7 +581,7 @@ int main(int,char**){
    if(!collected&&std::fabs(x-804)<65&&std::fabs((y-35)-270)<80){collected=true;play(audio,mix,sfx_healed1,sfx_healed1_count,.75f);}
    // Agua causa falha, jacare apenas visual
    bool water=((x+20>2320&&x-20<2660)||(x+20>3170&&x-20<4510));
-   if(water&&y+35>=650){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
+   if(water&&y+35>=635){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
    // A porta exige Y, como a interacao da fase 2. O coelho continua obrigatorio.
    if(collected && (down&HidNpadButton_Y) && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=380){
     finished=true;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=false;SDL_UnlockAudioDevice(audio);}play(audio,mix,sfx_complete,sfx_complete_count,.85f);
