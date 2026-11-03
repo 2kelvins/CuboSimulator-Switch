@@ -40,17 +40,11 @@ static void l2label(SDL_Renderer*r,const char*s,int x,int y,int scale,int R,int 
 }
 static void l2cloud(SDL_Renderer*r,Rect p,float cx,float cy,bool moving){
  const float x=p.x,y=p.y,w=p.w;
- l2ellipse(r,x+w*.50f,y+8,w*.50f,16,117,187,199,cx,cy);
+
  l2ellipse(r,x+w*.50f,y-4,w*.49f,20,242,252,254,cx,cy);
  l2ellipse(r,x+w*.27f,y-13,w*.21f,25,250,254,255,cx,cy);
  l2ellipse(r,x+w*.63f,y-18,w*.26f,31,255,255,255,cx,cy);
  l2ellipse(r,x+w*.80f,y-6,w*.16f,21,249,254,255,cx,cy);
- // Small pastel shadow and highlights make the clouds feel layered.
- for(int k=0;k<5;k++){
-  float xx=x+14+k*(w-30)/5;
-  l2box(r,xx,y+13+(k%2)*3,15,3,162,210,232,cx,cy);
-  l2box(r,xx+5,y-19-(k%3)*4,9,3,255,255,255,cx,cy);
- }
  if(moving){l2box(r,x+w*.41f,y-12,10,5,255,204,144,cx,cy);}
 }
 // Predios de condominio: varios pavimentos, paredes desgastadas e janelas.
@@ -107,7 +101,7 @@ struct Level2 {
  // Coordenadas do mundo: Y diminui ao subir. "feet" e a base da Laura.
  static constexpr float pitLeft=690.f,pitRight=870.f;
  static constexpr float waterLeft=1509.f,waterRight=3130.f;
- static constexpr float treeTop=360.f, momX=4040.f,momFeet=1250.f;
+ static constexpr float treeTop=360.f, momX=4115.f,momFeet=1250.f;
  float x=385,feet=L2_GROUND,vy=0,camX=0,camY=845,clock=0,runClock=0,jumpElapsed=0,dropTimer=0,peakFeet=L2_GROUND;
  float fade=0,interactionTimer=0;
  int fadeState=0,interaction=0;
@@ -345,19 +339,12 @@ struct Level2 {
   l2house(r,350,965,255,L2_GROUND,222,168,143,cx,cy);
   l2house(r,667,1055,245,L2_GROUND,204,199,170,cx,cy);
   l2label(r,"CONDOMINIO",75,940,2,103,81,74,cx,cy);
-  // Separate the foreground masonry from the buildings behind it.
-  // The wall stops above the green ground edge, never spilling into soil.
-  l2box(r,713,1135,760,L2_GROUND-1135-12,113,108,106,cx,cy);
-  l2texture(r,5,713,1135,760,L2_GROUND-1135-12,cx,cy);
-  l2box(r,713,1128,760,10,66,69,76,cx,cy);
-  for(int row=0;row<6;++row)for(int col=0;col<11;++col){
-   float px=722+col*67+(row%2)*20,py=1170+row*51;
-   if(px<1460)l2box(r,px,py,25+(col%3)*7,3,137,115,98,cx,cy);
-  }
+  // Separate wall segments, preserving the gaps and building facades.
   for(const auto&p:walls){
    float wallHeight=std::max(1.f,L2_GROUND-p.y-12);
    l2box(r,p.x,p.y,p.w,wallHeight,110,108,106,cx,cy);
    l2texture(r,5,p.x,p.y,p.w,wallHeight,cx,cy);
+   l2box(r,p.x,p.y+wallHeight-5,p.w,5,76,73,72,cx,cy);
    l2box(r,p.x,p.y-7,p.w,13,67,71,79,cx,cy);
    l2box(r,p.x,p.y-7,p.w,3,116,120,128,cx,cy);
    for(int i=0;i<int(p.w)/48;i++)l2box(r,p.x+9+i*48,p.y+28+(i%2)*22,27,4,131,113,92,cx,cy);
@@ -384,13 +371,18 @@ struct Level2 {
    float tx=2560+i*54;
    l2ellipse(r,tx,346+(i%3)*10,110,77,59+(i%3)*8,156+(i%3)*10,76,cx,cy);
   }
+  for(int i=0;i<9;i++){
+   float tx=2570+i*49;
+   l2ellipse(r,tx,423+(i%3)*14,65,54,48+(i%3)*9,141+(i%3)*12,64,cx,cy);
+   l2ellipse(r,tx+13,466+(i%2)*19,46,39,65,162,69,cx,cy);
+  }
   l2box(r,2550,treeTop-3,445,13,109,183,79,cx,cy);
   if(!collected)l2capy(r,2740,treeTop-4,cx,cy);
   // Autoescola mais alta e a ESQUERDA do consultorio.
   l2house(r,3150,535,350,L2_GROUND,227,198,158,cx,cy);
-  l2box(r,3175,625,292,55,102,138,122,cx,cy);
-  l2label(r,"AUTO-ESCOLA",3190,642,2,255,245,212,cx,cy);
-  l2label(r,"PANTANAL",3215,670,2,255,245,212,cx,cy);
+  l2box(r,3175,697,292,60,102,138,122,cx,cy);
+  l2label(r,"AUTO-ESCOLA",3190,706,2,255,245,212,cx,cy);
+  l2label(r,"PANTANAL",3215,732,2,255,245,212,cx,cy);
   for(const auto&p:awnings){
    l2box(r,p.x,p.y,p.w,18,94,151,163,cx,cy);
    l2box(r,p.x,p.y,p.w,7,205,233,230,cx,cy);
@@ -398,8 +390,8 @@ struct Level2 {
   }
   // Consultorio e o ULTIMO predio; altura menor que a Autoescola.
   l2house(r,3670,965,450,L2_GROUND,246,228,205,cx,cy);
-  l2box(r,3700,1010,388,59,81,158,169,cx,cy);
-  l2label(r,"CONSULTORIO",3717,1030,3,255,248,232,cx,cy);
+  l2box(r,3700,1100,388,62,81,158,169,cx,cy);
+  l2label(r,"CONSULTORIO",3717,1119,3,255,248,232,cx,cy);
   // Degraus na direcao correta: da ESQUERDA (baixo) para DIREITA (alto).
   for(const auto&p:stairs){
    l2box(r,p.x,p.y,p.w,L2_GROUND-p.y+12,143,137,132,cx,cy);
