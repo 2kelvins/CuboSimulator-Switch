@@ -57,8 +57,16 @@ static void l2cloud(SDL_Renderer*r,Rect p,float cx,float cy,bool moving){
 static void l2house(SDL_Renderer*r,float x,float roof,float w,float bottom,int R,int G,int B,float cx,float cy){
  float top=roof+10;
  l2box(r,x,top,w,bottom-top,R,G,B,cx,cy);
- // Reuse the embedded tileable wall texture; camera offset is applied once.
- l2texture(r,R>235?1:(G>190?3:2),x,top,w,bottom-top,cx,cy);
+ // Residential/commercial plaster facades: no exposed-brick wall tile here.
+ // Draw subtle stucco patches and trim only inside the building footprint.
+ for(int row=0;row<int((bottom-top-18)/96);++row)for(int col=0;col<int((w-20)/82);++col){
+  float px=x+12+col*82+(row%2)*9,py=top+22+row*96;
+  if(px+44<x+w-8&&py+7<bottom-12){
+   l2box(r,px,py,38,3,std::max(0,R-11),std::max(0,G-10),std::max(0,B-9),cx,cy);
+   l2box(r,px+11,py+5,18,2,std::min(255,R+9),std::min(255,G+8),std::min(255,B+7),cx,cy);
+  }
+ }
+ l2box(r,x,top,w,5,std::max(0,R-28),std::max(0,G-25),std::max(0,B-22),cx,cy);
  l2box(r,x-7,roof,w+14,11,85,82,91,cx,cy);
  l2texture(r,4,x-7,roof,w+14,7,cx,cy);
  l2box(r,x-7,roof+10,w+14,4,199,121,101,cx,cy);
@@ -337,15 +345,19 @@ struct Level2 {
   l2house(r,350,965,255,L2_GROUND,222,168,143,cx,cy);
   l2house(r,667,1055,245,L2_GROUND,204,199,170,cx,cy);
   l2label(r,"CONDOMINIO",75,940,2,103,81,74,cx,cy);
-  // Uma fachada frontal continua faz os muros parecerem parte da rua, nao escadinhas soltas.
-  l2box(r,713,1135,760,L2_GROUND-1135,174,155,137,cx,cy);
+  // Separate the foreground masonry from the buildings behind it.
+  // The wall stops above the green ground edge, never spilling into soil.
+  l2box(r,713,1135,760,L2_GROUND-1135-12,113,108,106,cx,cy);
+  l2texture(r,5,713,1135,760,L2_GROUND-1135-12,cx,cy);
+  l2box(r,713,1128,760,10,66,69,76,cx,cy);
   for(int row=0;row<6;++row)for(int col=0;col<11;++col){
    float px=722+col*67+(row%2)*20,py=1170+row*51;
    if(px<1460)l2box(r,px,py,25+(col%3)*7,3,137,115,98,cx,cy);
   }
   for(const auto&p:walls){
-   l2box(r,p.x,p.y,p.w,1500-p.y,171,151,123,cx,cy);
-   l2texture(r,5,p.x,p.y,p.w,1500-p.y,cx,cy);
+   float wallHeight=std::max(1.f,L2_GROUND-p.y-12);
+   l2box(r,p.x,p.y,p.w,wallHeight,110,108,106,cx,cy);
+   l2texture(r,5,p.x,p.y,p.w,wallHeight,cx,cy);
    l2box(r,p.x,p.y-7,p.w,13,67,71,79,cx,cy);
    l2box(r,p.x,p.y-7,p.w,3,116,120,128,cx,cy);
    for(int i=0;i<int(p.w)/48;i++)l2box(r,p.x+9+i*48,p.y+28+(i%2)*22,27,4,131,113,92,cx,cy);
@@ -356,6 +368,11 @@ struct Level2 {
   for(int i=0;i<7;i++)l2box(r,1475+i*4,1200,2,290,86,95,101,cx,cy);
   l2box(r,1471,1200,36,13,78,88,95,cx,cy);
   l2box(r,1471,1330,36,9,78,88,95,cx,cy);
+  // Redraw the ground border in front of all masonry to keep a clean edge.
+  for(const auto&p:ground){
+   l2box(r,p.x,p.y-8,p.w,11,123,207,93,cx,cy);
+   l2box(r,p.x,p.y+3,p.w,7,87,162,77,cx,cy);
+  }
   // Nuvenzinhas brancas do percurso, sem plataformas artificiais no cenario.
   for(const auto&cl:clouds)l2cloud(r,cl.r,cx,cy,cl.moving);
   // Arvore gigante, copa segura e capivarinha de pelucia.
