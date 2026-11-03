@@ -179,22 +179,42 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
   }
   for(int xx=a+8;xx<b-20;xx+=43){int wave=int(3*std::sin(time*2.2f+xx*.065f));fill(r,xx,652+wave,23,2,164,224,222,int(cam));}
  }
- // Jacare animado: corpo ondulante, cauda, patas, focinho, dentes e olho.
+ // Crocodile: shaded pixel-art silhouette with animated tail, scales and eyes.
  float crocX=3730+145*std::sin(time*.72f), bob=3*std::sin(time*2.8f);
  float tail=22*std::sin(time*3.1f);
- fill(r,crocX-65,681+tail*.25f,82,13,62,99,46,int(cam));
- fill(r,crocX-94,686+tail*.45f,34,7,59,94,42,int(cam));
- fill(r,crocX,666+bob,177,30,66,112,47,int(cam));
- for(int j=0;j<8;j++)fill(r,crocX+10+j*20,661+bob+(j%2)*3,12,8,48,85,39,int(cam));
- fill(r,crocX+23,691+bob,24,10,50,89,39,int(cam));
- fill(r,crocX+130,691+bob,23,10,50,89,39,int(cam));
- fill(r,crocX+160,654+bob,47,32,75,127,51,int(cam));
- fill(r,crocX+191,672+bob,60,14,78,126,50,int(cam));
- fill(r,crocX+194,682+bob,54,6,51,77,40,int(cam));
- for(int j=0;j<5;j++)fill(r,crocX+199+j*10,680+bob,5,5,240,235,199,int(cam));
- fill(r,crocX+183,661+bob,9,8,248,242,190,int(cam));
- fill(r,crocX+187,662+bob,3,4,26,34,22,int(cam));
- fill(r,crocX+238,672+bob,5,4,37,64,29,int(cam));
+ // Tail layers and segmented dorsal ridge.
+ fill(r,crocX-105,684+tail*.48f,43,7,30,69,48,int(cam));
+ fill(r,crocX-78,679+tail*.30f,87,15,38,89,55,int(cam));
+ fill(r,crocX-60,682+tail*.22f,80,7,83,146,69,int(cam));
+ fill(r,crocX,665+bob,178,33,29,77,46,int(cam));
+ fill(r,crocX+4,669+bob,169,22,61,125,60,int(cam));
+ fill(r,crocX+11,688+bob,158,7,104,139,73,int(cam));
+ for(int j=0;j<10;j++){
+  float xx=crocX+5+j*17;
+  fill(r,xx,659+bob+(j%2)*3,13,8,29,69,42,int(cam));
+  fill(r,xx+3,661+bob+(j%2)*3,7,3,105,160,72,int(cam));
+ }
+ for(int j=0;j<8;j++){
+  fill(r,crocX+12+j*20,676+bob+(j%2)*5,10,5,34,95,52,int(cam));
+  fill(r,crocX+17+j*20,681+bob+(j%2)*5,5,3,131,173,82,int(cam));
+ }
+ for(int j=0;j<2;j++){
+  float xx=crocX+22+j*111;
+  fill(r,xx,692+bob,26,11,30,68,41,int(cam));
+  fill(r,xx+4,699+bob,22,4,70,113,55,int(cam));
+ }
+ // Distinct head, snout, jaw, nostril and blink.
+ fill(r,crocX+158,653+bob,52,37,31,82,47,int(cam));
+ fill(r,crocX+164,658+bob,45,28,77,139,66,int(cam));
+ fill(r,crocX+194,670+bob,62,19,43,103,53,int(cam));
+ fill(r,crocX+204,672+bob,50,9,102,155,72,int(cam));
+ fill(r,crocX+196,686+bob,58,7,28,63,44,int(cam));
+ for(int j=0;j<6;j++)fill(r,crocX+201+j*9,683+bob,4,5,242,229,177,int(cam));
+ fill(r,crocX+181,658+bob,16,11,29,65,40,int(cam));
+ bool blink=std::fmod(time,5.2f)<.13f;
+ fill(r,crocX+185,661+bob,10,blink?2:7,250,222,111,int(cam));
+ if(!blink)fill(r,crocX+190,662+bob,4,5,22,31,26,int(cam));
+ fill(r,crocX+241,673+bob,5,4,23,49,34,int(cam));
  // Escadaria solida visualmente: degraus apoiados no terreno e colisoes no topo.
  for(int i=0;i<8;i++){float xx=4510+i*76, yy=615-i*35;fill(r,xx,yy,80,SH-yy,96,97,88,int(cam));fill(r,xx,yy,80,9,178,176,150,int(cam));}
  // A escola tem alicerce ate o solo, sem vazio embaixo.
@@ -208,6 +228,12 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  label(r,"ESCOLA ARCO-IRIS",5120,264,3,239,244,220,int(cam));fill(r,5270,286,112,84,35,80,69,int(cam));fill(r,5321,286,5,84,181,204,187,int(cam));
  // Caixas e superficie do muro; telhados usam a propria arte das construcoes.
  for(const auto& b:blocks){
+  // Dark graphite coping on top of solid masonry walls, not terracotta roof red.
+  if(b.w>90&&b.h>30&&b.y<615){
+   fill(r,b.x,b.y-3,b.w,8,69,70,78,int(cam));
+   for(int tx=int(b.x)+8;tx<int(b.x+b.w)-4;tx+=36)
+    fill(r,tx,b.y-2,19,2,117,120,127,int(cam));
+  }
   if(b.w==64&&b.h==64)crate(r,b.x,b.y,int(cam));
  }
  for(const auto& p:returnPlatforms){fill(r,p.x,p.y,p.w,p.h,111,132,145,int(cam));fill(r,p.x,p.y,p.w,6,176,207,207,int(cam));fill(r,p.x+9,p.y+10,p.w-18,4,64,93,109,int(cam));}
