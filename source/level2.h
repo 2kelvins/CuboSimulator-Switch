@@ -10,6 +10,24 @@ static void l2box(SDL_Renderer*r,float x,float y,float w,float h,int R,int G,int
  SDL_SetRenderDrawColor(r,(Uint8)R,(Uint8)G,(Uint8)B,255);
  SDL_Rect q{int(x-cx),int(y-cy),std::max(1,int(w)),std::max(1,int(h))}; SDL_RenderFillRect(r,&q);
 }
+static void l2texture(SDL_Renderer*r,int id,float x,float y,float w,float h,float cx,float cy){
+ if(id<0||id>=9||!terrainTextures[id])return;
+ SDL_Texture* tex=terrainTextures[id];int tw=0,th=0;
+ SDL_QueryTexture(tex,nullptr,nullptr,&tw,&th);if(tw<1||th<1)return;
+ int left=int(x),top=int(y),right=int(x+w),bottom=int(y+h);
+ for(int yy=top;yy<bottom;){
+  int sy=((yy%th)+th)%th,dh=std::min(th-sy,bottom-yy);
+  for(int xx=left;xx<right;){
+   int sx=((xx%tw)+tw)%tw,dw=std::min(tw-sx,right-xx);
+   SDL_Rect dst{int(xx-cx),int(yy-cy),dw,dh};
+   if(dst.x+dw>0&&dst.x<SW&&dst.y+dh>0&&dst.y<SH){
+    SDL_Rect src{sx,sy,dw,dh};SDL_RenderCopy(r,tex,&src,&dst);
+   }
+   xx+=dw;
+  }
+  yy+=dh;
+ }
+}
 static void l2ellipse(SDL_Renderer*r,float cx,float cy,float rx,float ry,int R,int G,int B,float cameraX,float cameraY){
  SDL_SetRenderDrawColor(r,(Uint8)R,(Uint8)G,(Uint8)B,255);
  for(int y=-int(ry);y<=int(ry);++y){
@@ -40,9 +58,9 @@ static void l2house(SDL_Renderer*r,float x,float roof,float w,float bottom,int R
  float top=roof+10;
  l2box(r,x,top,w,bottom-top,R,G,B,cx,cy);
  // Reuse the embedded tileable wall texture; camera offset is applied once.
- textureFill(r,5,x-cx,top-cy,w,bottom-top,0);
+ l2texture(r,R>235?1:(G>190?3:2),x,top,w,bottom-top,cx,cy);
  l2box(r,x-7,roof,w+14,11,85,82,91,cx,cy);
- textureFill(r,4,x-7-cx,roof-cy,w+14,7,0);
+ l2texture(r,4,x-7,roof,w+14,7,cx,cy);
  l2box(r,x-7,roof+10,w+14,4,199,121,101,cx,cy);
  int cols=std::max(2,int(w/86)),floors=std::max(1,int((bottom-top-30)/135));
  for(int row=0;row<floors;++row)for(int col=0;col<cols;++col){
@@ -120,7 +138,10 @@ struct Level2 {
   // Toldos empilhados na fachada da Autoescola, a ESQUERDA do consultorio.
   awnings={{3505,1075,195,13},{3505,1195,195,13},{3505,1315,195,13},{3505,1427,195,13}};
   // Escadaria na entrada do consultorio sobe da esquerda para direita.
+  // Stair treads rise gently from left to right; final landing reaches the glass door.
   for(int i=0;i<5;++i)stairs.push_back({3745.f+i*65,1442.f-i*48,65.f,350.f+i*48});
+  // A wide final landing makes the entrance reachable without a last awkward hop.
+  stairs.push_back({4070.f,1250.f,95.f,240.f});
  }
  void reset(){
   x=385;feet=L2_GROUND;vy=0;camX=0;camY=845;clock=0;runClock=0;
@@ -324,7 +345,7 @@ struct Level2 {
   }
   for(const auto&p:walls){
    l2box(r,p.x,p.y,p.w,1500-p.y,171,151,123,cx,cy);
-   textureFill(r,5,p.x-cx,p.y-cy,p.w,1500-p.y,0);
+   l2texture(r,5,p.x,p.y,p.w,1500-p.y,cx,cy);
    l2box(r,p.x,p.y-7,p.w,13,67,71,79,cx,cy);
    l2box(r,p.x,p.y-7,p.w,3,116,120,128,cx,cy);
    for(int i=0;i<int(p.w)/48;i++)l2box(r,p.x+9+i*48,p.y+28+(i%2)*22,27,4,131,113,92,cx,cy);
@@ -364,8 +385,11 @@ struct Level2 {
   l2label(r,"CONSULTORIO",3717,1030,3,255,248,232,cx,cy);
   // Degraus na direcao correta: da ESQUERDA (baixo) para DIREITA (alto).
   for(const auto&p:stairs){
-   l2box(r,p.x,p.y,p.w,L2_GROUND-p.y+12,157,150,138,cx,cy);
-   l2box(r,p.x,p.y,p.w,10,213,209,192,cx,cy);
+   l2box(r,p.x,p.y,p.w,L2_GROUND-p.y+12,143,137,132,cx,cy);
+   l2box(r,p.x,p.y,p.w,10,206,203,195,cx,cy);
+   l2box(r,p.x+5,p.y+11,3,L2_GROUND-p.y,104,104,105,cx,cy);
+   for(int yy=int(p.y)+29;yy<L2_GROUND;yy+=27)
+    l2box(r,p.x+8,yy,p.w-16,2,165,158,149,cx,cy);
   }
   // Porta de vidro na altura do patamar onde a Mamae espera olhando para a esquerda.
   l2box(r,4020,1103,100,147,83,151,166,cx,cy);
