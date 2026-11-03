@@ -27,6 +27,12 @@ static void l2cloud(SDL_Renderer*r,Rect p,float cx,float cy,bool moving){
  l2ellipse(r,x+w*.27f,y-13,w*.21f,25,250,254,255,cx,cy);
  l2ellipse(r,x+w*.63f,y-18,w*.26f,31,255,255,255,cx,cy);
  l2ellipse(r,x+w*.80f,y-6,w*.16f,21,249,254,255,cx,cy);
+ // Small pastel shadow and highlights make the clouds feel layered.
+ for(int k=0;k<5;k++){
+  float xx=x+14+k*(w-30)/5;
+  l2box(r,xx,y+13+(k%2)*3,15,3,162,210,232,cx,cy);
+  l2box(r,xx+5,y-19-(k%3)*4,9,3,255,255,255,cx,cy);
+ }
  if(moving){l2box(r,x+w*.41f,y-12,10,5,255,204,144,cx,cy);}
 }
 // Predios de condominio: varios pavimentos, paredes desgastadas e janelas.
@@ -318,7 +324,9 @@ struct Level2 {
   }
   for(const auto&p:walls){
    l2box(r,p.x,p.y,p.w,1500-p.y,171,151,123,cx,cy);
-   l2box(r,p.x,p.y-7,p.w,13,208,185,149,cx,cy);
+   textureFill(r,5,p.x-cx,p.y-cy,p.w,1500-p.y,0);
+   l2box(r,p.x,p.y-7,p.w,13,67,71,79,cx,cy);
+   l2box(r,p.x,p.y-7,p.w,3,116,120,128,cx,cy);
    for(int i=0;i<int(p.w)/48;i++)l2box(r,p.x+9+i*48,p.y+28+(i%2)*22,27,4,131,113,92,cx,cy);
   }
   l2box(r,1310,1426,64,64,103,66,43,cx,cy);
