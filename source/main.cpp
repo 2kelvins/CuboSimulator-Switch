@@ -16,6 +16,7 @@
 #include "title_art.h"
 #include "pause_assets_generated.h"
 #include "complete_assets_generated.h"
+#include "terrain_assets_generated.h"
 
 constexpr int SW=1280, SH=720;
 constexpr float WORLD=5650.0f, GROUND=615.0f;
@@ -61,6 +62,44 @@ static void fill(SDL_Renderer*r,float x,float y,float w,float h,Uint8 R,Uint8 G,
  SDL_SetRenderDrawColor(r,R,G,B,255); SDL_Rect a{int(x-cam),int(y),int(w),int(h)};SDL_RenderFillRect(r,&a);
 }
 static void line(SDL_Renderer*r,int x,int y,int x2,int y2,Uint8 R,Uint8 G,Uint8 B,int cam=0){SDL_SetRenderDrawColor(r,R,G,B,255);SDL_RenderDrawLine(r,x-cam,y,x2-cam,y2);}
+
+// Stage 1 textures are drawn over the original geometric surfaces; physics is unchanged.
+static SDL_Texture* terrainTextures[9]{};
+static void initTerrainTextures(SDL_Renderer*r){
+ for(int i=0;i<9;i++){
+  const TerrainAsset&a=*terrain_assets[i];
+  SDL_Surface*s=SDL_CreateRGBSurfaceWithFormat(0,a.w,a.h,32,SDL_PIXELFORMAT_RGBA8888);
+  if(!s)continue;
+  Uint32*px=(Uint32*)s->pixels;int pos=0;
+  for(int j=0;j<a.count;j++){
+   const TerrainRun&run=a.runs[j];
+   Uint32 color=SDL_MapRGBA(s->format,Uint8(run.rgba>>24),Uint8(run.rgba>>16),Uint8(run.rgba>>8),Uint8(run.rgba));
+   for(uint32_t k=0;k<run.count;k++)px[pos++]=color;
+  }
+  terrainTextures[i]=SDL_CreateTextureFromSurface(r,s);SDL_FreeSurface(s);
+  if(terrainTextures[i])SDL_SetTextureBlendMode(terrainTextures[i],SDL_BLENDMODE_NONE);
+ }
+}
+static void textureFill(SDL_Renderer*r,int id,float x,float y,float w,float h,int cam){
+ if(id<0||id>=9||!terrainTextures[id])return;
+ SDL_Texture*t=terrainTextures[id];int tw=0,th=0;
+ SDL_QueryTexture(t,nullptr,nullptr,&tw,&th);if(tw<=0||th<=0)return;
+ int left=int(x)-cam,top=int(y),right=int(x+w)-cam,bottom=int(y+h);
+ // Cull offscreen tiles; world-anchored pattern prevents visible swimming.
+ for(int yy=top;yy<bottom;){
+  int sy=((yy%th)+th)%th,dy=std::min(th-sy,bottom-yy);
+  for(int xx=left;xx<right;){
+   int sx=(((xx+cam)%tw)+tw)%tw,dx=std::min(tw-sx,right-xx);
+   if(xx+dx>0&&xx<SW&&yy+dy>0&&yy<SH){
+    SDL_Rect src{sx,sy,dx,dy},dst{xx,yy,dx,dy};
+    SDL_RenderCopy(r,t,&src,&dst);
+   }
+   xx+=dx;
+  }
+  yy+=dy;
+ }
+}
+
 static const char* glyph(char c){switch(c){
  case 'A':return "011101000110001111111000110001";case 'B':return "11110100011000111110100011000111110";
  case 'C':return "01111100001000010000100001000001111";case 'D':return "11110100011000110001100011000111110";
@@ -82,7 +121,7 @@ static void label(SDL_Renderer*r,const char* s,int x,int y,int scale,Uint8 R,Uin
  for(;*s;s++,x+=6*scale){const char* g=glyph(*s);for(int k=0;k<35&&g[k];k++)if(g[k]=='1')fill(r,x+(k%5)*scale,y+(k/5)*scale,scale,scale,R,G,B,cam);}
 }
 static void building(SDL_Renderer*r,int x,int top,int w,int h,Uint8 cr,Uint8 cg,Uint8 cb,int cam){
- fill(r,x,top,w,h,cr,cg,cb,cam);fill(r,x,top,w,9,98,66,52,cam);
+ fill(r,x,top,w,h,cr,cg,cb,cam);textureFill(r,cr<120?0:cr>200?1:cr>185?2:3,x,top,w,h,cam);fill(r,x,top,w,9,98,66,52,cam);
  for(int i=0;i<w/80;i++){int wx=x+25+i*80;fill(r,wx,top+45,39,52,65,79,84,cam);fill(r,wx+4,top+49,31,44,122,166,176,cam);fill(r,wx+18,top+49,3,44,54,63,66,cam);}
  for(int i=0;i<w/45;i++)fill(r,x+17+i*45,top+h-32,21,3,cr-std::min<int>(cr,20),cg-std::min<int>(cg,20),cb-std::min<int>(cb,20),cam);
 }
@@ -100,7 +139,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  // Predios de condominio (0.25x)
  for(int i=0;i<23;i++){int px=i*265-int(cam*.25f);int top=250+(i%4)*21;fill(r,px,top,110,GROUND-top,196,184,161);for(int j=0;j<3;j++)for(int k=0;k<4;k++)fill(r,px+14+j*32,top+30+k*54,15,24,99,125,138);}
  // Casas e arvores no plano medio (0.43x)
- for(int i=0;i<34;i++){int px=i*175-int(cam*.43f);fill(r,px,400+(i%3)*14,118,GROUND-(400+(i%3)*14),204,167,134);fill(r,px-8,389+(i%3)*14,132,17,152,79,62);
+ for(int i=0;i<34;i++){int px=i*175-int(cam*.43f);fill(r,px,400+(i%3)*14,118,GROUND-(400+(i%3)*14),204,167,134);fill(r,px-8,389+(i%3)*14,132,17,152,79,62);textureFill(r,4,px-8,389+(i%3)*14,132,17,0);
   fill(r,px+137,390,9,GROUND-390,93,67,46);fill(r,px+103,344,76,55,58,122,74);fill(r,px+114,327,53,45,72,137,80);}
  // Vila
  building(r,0,312,460,303,88,144,143,int(cam));building(r,460,310,585,305,206,164,111,int(cam));
@@ -112,19 +151,19 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  fill(r,535,450,250,116,129,190,195,int(cam));fill(r,545,460,230,98,193,221,219,int(cam));fill(r,540,525,240,12,115,73,49,int(cam));for(int i=0;i<8;i++)fill(r,552+i*27,489+(i%2)*13,22,18,206,145,71,int(cam));
  fill(r,815,433,94,145,71,101,109,int(cam));for(int i=0;i<3;i++)fill(r,825,448+i*37,75,27,190,218,220,int(cam));
  // telhas da padaria e mercado
- for(int i=0;i<26;i++)fill(r,i*42,299+(i%2)*3,40,14,144+(i%3)*12,68,51,int(cam));
+ for(int i=0;i<26;i++){fill(r,i*42,299+(i%2)*3,40,14,144+(i%3)*12,68,51,int(cam));textureFill(r,4,i*42,299+(i%2)*3,40,14,int(cam));}
  // Rua e muros de casas
  building(r,1270,277,320,338,180,157,133,int(cam));building(r,1680,335,430,280,191,166,137,int(cam));
- fill(r,1490,427,590,188,146,137,120,int(cam));for(int i=0;i<16;i++)fill(r,1495+i*36,438+(i%3)*11,24,3,117,108,96,int(cam));
+ fill(r,1490,427,590,188,146,137,120,int(cam));textureFill(r,5,1490,427,590,188,int(cam));for(int i=0;i<16;i++)fill(r,1495+i*36,438+(i%3)*11,24,3,117,108,96,int(cam));
  // Muro de separacao: chega ate o solo e bloqueia acesso lateral ao corrego.
- fill(r,2110,430,210,185,140,132,113,int(cam));
+ fill(r,2110,430,210,185,140,132,113,int(cam));textureFill(r,5,2110,430,210,185,int(cam));
  fill(r,2110,425,210,12,187,174,147,int(cam));
  for(int i=0;i<5;i++)fill(r,2120+i*40,470+(i%2)*24,26,4,111,105,91,int(cam));
  // grade: vazada, NAO e solida
  for(int i=0;i<9;i++)fill(r,1445+i*16,435,5,180,63,69,68,int(cam));
  fill(r,1440,435,152,9,55,61,59,int(cam));
  // Calçadas e beiradas dos corrego
- auto ground=[&](float a,float b,float top){fill(r,a,top,b-a,SH-top,86,85,76,int(cam));fill(r,a,top,b-a,13,171,167,147,int(cam));for(int i=int(a);i<b;i+=54)line(r,i,int(top+13),i+12,int(top+13),61,64,62,int(cam));};
+ auto ground=[&](float a,float b,float top){fill(r,a,top,b-a,SH-top,86,85,76,int(cam));fill(r,a,top,b-a,13,171,167,147,int(cam));textureFill(r,6,a,top,b-a,13,int(cam));for(int i=int(a);i<b;i+=54)line(r,i,int(top+13),i+12,int(top+13),61,64,62,int(cam));};
  ground(0,2320,615);ground(2660,3170,615);ground(4510,5650,615);
  // agua dos dois corregos
  for(int n=0;n<2;n++){int a=n==0?2320:3170,b=n==0?2660:4510;
@@ -265,6 +304,7 @@ int main(int,char**){
  if(!r){SDL_DestroyWindow(win);SDL_Quit();return 3;}
  initPauseTextures(r);
  initCompleteTextures(r);
+ initTerrainTextures(r);
  auto loadFrame=[&](const FrameData& frame)->SDL_Texture*{
   SDL_Surface* s=SDL_CreateRGBSurfaceWithFormat(0,frame.w,frame.h,32,SDL_PIXELFORMAT_RGBA8888);if(!s)return nullptr;
   SDL_LockSurface(s);Uint32* px=(Uint32*)s->pixels;int pos=0;
@@ -528,5 +568,5 @@ int main(int,char**){
   if(paused)pauseMenu(r,pauseChoice,bgmEnabled);
   SDL_RenderPresent(r);
  }
- if(audio)SDL_CloseAudioDevice(audio);for(auto&t:pauseTextures)if(t)SDL_DestroyTexture(t);for(auto&t:completeTextures)if(t)SDL_DestroyTexture(t);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
+ if(audio)SDL_CloseAudioDevice(audio);for(auto&t:pauseTextures)if(t)SDL_DestroyTexture(t);for(auto&t:completeTextures)if(t)SDL_DestroyTexture(t);for(auto&t:terrainTextures)if(t)SDL_DestroyTexture(t);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
 }
