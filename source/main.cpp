@@ -120,9 +120,9 @@ static const char* glyph(char c){switch(c){
 static void label(SDL_Renderer*r,const char* s,int x,int y,int scale,Uint8 R,Uint8 G,Uint8 B,int cam){
  for(;*s;s++,x+=6*scale){const char* g=glyph(*s);for(int k=0;k<35&&g[k];k++)if(g[k]=='1')fill(r,x+(k%5)*scale,y+(k/5)*scale,scale,scale,R,G,B,cam);}
 }
-static void building(SDL_Renderer*r,int x,int top,int w,int h,Uint8 cr,Uint8 cg,Uint8 cb,int cam){
+static void building(SDL_Renderer*r,int x,int top,int w,int h,Uint8 cr,Uint8 cg,Uint8 cb,int cam,bool windows=true){
  fill(r,x,top,w,h,cr,cg,cb,cam);textureFill(r,cr<120?0:cr>200?1:cr>185?2:3,x,top,w,h,cam);fill(r,x,top,w,9,98,66,52,cam);
- for(int i=0;i<w/80;i++){int wx=x+25+i*80;fill(r,wx,top+45,39,52,65,79,84,cam);fill(r,wx+4,top+49,31,44,122,166,176,cam);fill(r,wx+18,top+49,3,44,54,63,66,cam);}
+ if(windows)for(int i=0;i<w/80;i++){int wx=x+25+i*80;fill(r,wx,top+45,39,52,65,79,84,cam);fill(r,wx+4,top+49,31,44,122,166,176,cam);fill(r,wx+18,top+49,3,44,54,63,66,cam);}
  for(int i=0;i<w/45;i++)fill(r,x+17+i*45,top+h-32,21,3,cr-std::min<int>(cr,20),cg-std::min<int>(cg,20),cb-std::min<int>(cb,20),cam);
 }
 static void crate(SDL_Renderer*r,float x,float y,int cam){fill(r,x,y,64,64,105,64,33,cam);fill(r,x+5,y+5,54,54,167,113,61,cam);line(r,x+7,y+7,x+57,y+57,91,57,34,cam);line(r,x+57,y+7,x+7,y+57,91,57,34,cam);}
@@ -142,7 +142,7 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  for(int i=0;i<34;i++){int px=i*175-int(cam*.43f);fill(r,px,400+(i%3)*14,118,GROUND-(400+(i%3)*14),204,167,134);fill(r,px-8,389+(i%3)*14,132,17,152,79,62);// Background roofs use their original solid shading to avoid texture swimming during parallax.
   fill(r,px+137,390,9,GROUND-390,93,67,46);fill(r,px+103,344,76,55,58,122,74);fill(r,px+114,327,53,45,72,137,80);}
  // Vila
- building(r,0,312,460,303,88,144,143,int(cam));building(r,460,310,585,305,206,164,111,int(cam));
+ building(r,0,312,460,303,88,144,143,int(cam),false);building(r,460,310,585,305,206,164,111,int(cam),false);
  fill(r,12,362,430,40,36,102,111,int(cam));label(r,"MERCADO",92,371,4,245,213,151,int(cam));
  fill(r,470,358,563,41,180,99,67,int(cam));label(r,"PADARIA",620,366,4,255,222,166,int(cam));
  // Vitrines, mercadorias e pessoas (figuras simples)
@@ -190,7 +190,9 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  // A escola tem alicerce ate o solo, sem vazio embaixo.
  fill(r,5050,370,600,SH-370,96,97,88,int(cam));
  fill(r,5050,370,600,10,178,176,150,int(cam));
- building(r,5050,165,600,205,113,167,113,int(cam));fill(r,5060,175,575,40,79,132,86,int(cam));
+ building(r,5050,165,600,205,113,167,113,int(cam),false);fill(r,5060,175,575,40,79,132,86,int(cam));
+ // Windows below the rainbow banner but above the school name, never behind signs.
+ for(int i=0;i<6;i++){int wx=5074+i*92;fill(r,wx,226,43,27,55,91,88,int(cam));fill(r,wx+4,229,35,20,150,206,209,int(cam));fill(r,wx+20,229,3,20,65,96,98,int(cam));}
  // arco iris simplificado em faixas
  for(int i=0;i<5;i++){Uint8 cols[5][3]={{220,86,80},{230,161,70},{220,208,84},{95,175,111},{96,137,204}};fill(r,5200+i*11,190+i*8,275-i*22,8,cols[i][0],cols[i][1],cols[i][2],int(cam));}
  label(r,"ESCOLA ARCO-IRIS",5120,264,3,239,244,220,int(cam));fill(r,5270,286,112,84,35,80,69,int(cam));fill(r,5321,286,5,84,181,204,187,int(cam));
@@ -538,8 +540,8 @@ int main(int,char**){
    // Agua causa falha, jacare apenas visual
    bool water=((x>=2320&&x<2660)||(x>=3170&&x<4510));
    if(water&&y+35>=618){fadeState=1;fade=0;play(audio,mix,sfx_water,sfx_water_count,.8f);}
-   // Conclusao exige tocar a porta, com o coelho coletado e sobre o patio.
-   if(collected && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=380){
+   // A porta exige Y, como a interacao da fase 2. O coelho continua obrigatorio.
+   if(collected && (down&HidNpadButton_Y) && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=380){
     finished=true;if(audio){SDL_LockAudioDevice(audio);mix.musicPlaying=false;SDL_UnlockAudioDevice(audio);}play(audio,mix,sfx_complete,sfx_complete_count,.85f);
    }
   }
@@ -551,6 +553,9 @@ int main(int,char**){
   scene(r,cam,worldTime,solid,movers,returnPlatforms,collected);
   // Indicador de objetivo (sem dependencia de fonte)
   fill(r,18,18,375,42,32,57,65);label(r,collected?"VA PARA A ESCOLA":"PEGUE O COELHO",35,28,3,250,240,214,0);
+  if(!finished && collected && x+26>5270 && x-26<5382 && y+35>=364 && y+35<=380){
+   fill(r,390,77,500,46,40,81,86);label(r,"APERTE Y PARA ENTRAR",423,89,3,255,244,213,0);
+  }
   int selected=0;
   if(hurtTimer>0)selected=15+std::min(2,int((.54f-hurtTimer)/.18f));
   else if(!grounded){if(jumpElapsed<.09f)selected=7;else if(vy<-90)selected=8;else if(vy<90)selected=9;else selected=10;}
