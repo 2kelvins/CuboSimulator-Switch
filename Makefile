@@ -39,7 +39,7 @@ source/complete_assets_generated.h: Laura_Adventure_Conclusao_Assets_V3.zip tool
 source/terrain_assets_generated.h: Laura_Adventure_Texturas_Fase1_V1.zip tools/generate_terrain_assets.py
 	python3 tools/generate_terrain_assets.py
 
-main.o: source/terrain_assets_generated.h source/main.cpp source/level2.h source/mamae_frames.h source/lauras_cloud_hop.h source/pause_assets_generated.h source/complete_assets_generated.h source/terrain_assets_generated.h
+main.o: source/main.cpp source/terrain_assets_generated.h source/level2.h source/mamae_frames.h source/lauras_cloud_hop.h source/pause_assets_generated.h source/complete_assets_generated.h source/terrain_assets_generated.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(TARGET).elf: main.o
@@ -49,4 +49,4 @@ $(TARGET).nro: $(TARGET).elf
 	elf2nro $< $@
 
 clean:
-	rm -f main.o $(TARGET).elf $(TARGET).nro source/pause_assets_generated.h source/complete_assets_generated.h
+	rm -f main.o $(TARGET).elf $(TARGET).nro source/pause_assets_generated.h source/complete_assets_generated.h source/terrain_assets_generated.h
