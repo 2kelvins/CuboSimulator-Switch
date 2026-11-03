@@ -33,7 +33,10 @@ static void l2cloud(SDL_Renderer*r,Rect p,float cx,float cy,bool moving){
 static void l2house(SDL_Renderer*r,float x,float roof,float w,float bottom,int R,int G,int B,float cx,float cy){
  float top=roof+10;
  l2box(r,x,top,w,bottom-top,R,G,B,cx,cy);
- l2box(r,x-7,roof,w+14,11,137,76,69,cx,cy);
+ // Reuse the embedded tileable wall texture; camera offset is applied once.
+ textureFill(r,5,x-cx,top-cy,w,bottom-top,0);
+ l2box(r,x-7,roof,w+14,11,85,82,91,cx,cy);
+ textureFill(r,4,x-7-cx,roof-cy,w+14,7,0);
  l2box(r,x-7,roof+10,w+14,4,199,121,101,cx,cy);
  int cols=std::max(2,int(w/86)),floors=std::max(1,int((bottom-top-30)/135));
  for(int row=0;row<floors;++row)for(int col=0;col<cols;++col){
