@@ -329,11 +329,7 @@ struct Level2 {
   l2box(r,pitLeft,L2_GROUND,9,340,67,47,38,cx,cy);
   l2box(r,pitRight-9,L2_GROUND,9,340,67,47,38,cx,cy);
   // Agua depois da grade: uma queda aqui reinicia a fase.
-  l2box(r,waterLeft,L2_GROUND,waterRight-waterLeft,360,38,125,157,cx,cy);
-  for(int i=0;i<38;i++){
-   float xx=waterLeft+10+i*43,wob=5*std::sin(clock*2+i*.8f);
-   l2box(r,xx,L2_GROUND+12+wob,25,3,158,232,229,cx,cy);
-  }
+  drawAnimatedWater(r,waterLeft,L2_GROUND,waterRight-waterLeft,360,cx,cy,clock);
   // Tres edificios diferentes no condominio. O primeiro fica quase a altura da tela.
   l2house(r,40,865,275,L2_GROUND,205,182,160,cx,cy);
   l2house(r,350,965,255,L2_GROUND,222,168,143,cx,cy);
