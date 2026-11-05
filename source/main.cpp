@@ -17,6 +17,7 @@
 #include "pause_assets_generated.h"
 #include "complete_assets_generated.h"
 #include "terrain_assets_generated.h"
+#include "water_assets_generated.h"
 
 constexpr int SW=1280, SH=720;
 constexpr float WORLD=5650.0f, GROUND=615.0f;
@@ -64,6 +65,41 @@ static void fill(SDL_Renderer*r,float x,float y,float w,float h,Uint8 R,Uint8 G,
 static void line(SDL_Renderer*r,int x,int y,int x2,int y2,Uint8 R,Uint8 G,Uint8 B,int cam=0){SDL_SetRenderDrawColor(r,R,G,B,255);SDL_RenderDrawLine(r,x-cam,y,x2-cam,y2);}
 
 // Stage 1 textures are drawn over the original geometric surfaces; physics is unchanged.
+// Animated water sprites extracted from Laura_Adventure_Agua_Leve.zip.
+static SDL_Texture* waterTextures[4]{};
+static void initWaterTextures(SDL_Renderer*r){
+ for(int i=0;i<4;i++){
+  const WaterAsset&a=*water_assets[i];
+  SDL_Surface*s=SDL_CreateRGBSurfaceWithFormat(0,a.w,a.h,32,SDL_PIXELFORMAT_RGBA8888);
+  if(!s)continue;
+  Uint32*px=(Uint32*)s->pixels;int pos=0;
+  for(int j=0;j<a.count;j++){
+   const WaterRun&run=a.runs[j];
+   Uint32 color=SDL_MapRGBA(s->format,Uint8(run.rgba>>24),Uint8(run.rgba>>16),Uint8(run.rgba>>8),Uint8(run.rgba));
+   for(uint32_t k=0;k<run.count;k++)px[pos++]=color;
+  }
+  waterTextures[i]=SDL_CreateTextureFromSurface(r,s);SDL_FreeSurface(s);
+ }
+}
+static void drawAnimatedWater(SDL_Renderer*r,float x,float y,float w,float h,float cx,float cy,float clock){
+ if(w<=0||h<=0)return;
+ SDL_SetRenderDrawColor(r,5,104,70,255);
+ SDL_Rect bg{int(x-cx),int(y-cy),int(w),int(h)};SDL_RenderFillRect(r,&bg);
+ int frame=(int(clock*5.0f)%4+4)%4;
+ SDL_Texture*t=waterTextures[frame];if(!t)return;
+ int tw=0,th=0;SDL_QueryTexture(t,nullptr,nullptr,&tw,&th);
+ if(tw<=0||th<=0)return;
+ // Source strip has a bright wave crest at its top. No extra blue border.
+ for(int yy=0;yy<int(h);yy+=th){
+  int dh=std::min(th,int(h)-yy);
+  for(int xx=0;xx<int(w);xx+=tw){
+   int dw=std::min(tw,int(w)-xx);
+   SDL_Rect src{0,0,dw,dh},dst{int(x-cx)+xx,int(y-cy)+yy,dw,dh};
+   SDL_RenderCopy(r,t,&src,&dst);
+  }
+ }
+}
+
 static SDL_Texture* terrainTextures[9]{};
 static void initTerrainTextures(SDL_Renderer*r){
  for(int i=0;i<9;i++){
@@ -167,17 +203,10 @@ static void scene(SDL_Renderer*r,float cam,float time,const std::vector<Rect>& b
  ground(0,2320,615);ground(2660,3170,615);ground(4510,5650,615);
  // agua dos dois corregos
  for(int n=0;n<2;n++){int a=n==0?2320:3170,b=n==0?2660:4510;
-  fill(r,a,635,b-a,SH-635,53,101,77,int(cam));
-  // Exposed canal walls and dark gray coping below the pavement.
-  fill(r,a,615,14,20,70,68,73,int(cam));fill(r,b-14,615,14,20,70,68,73,int(cam));
-  for(int yy=619;yy<634;yy+=11){fill(r,a,yy,14,2,112,108,110,int(cam));fill(r,b-14,yy,14,2,112,108,110,int(cam));}
-  fill(r,a,635,b-a,5,92,153,105,int(cam));
-  for(int yy=649;yy<SH;yy+=22)for(int xx=a+12;xx<b-12;xx+=58){
-   int phase=int(4*std::sin(time*1.8f+xx*.045f+yy*.03f));
-   fill(r,xx+phase,yy,25,3,65,126,83,int(cam));
-   fill(r,xx+phase+8,yy+5,13,2,139,183,115,int(cam));
-  }
-  for(int xx=a+8;xx<b-20;xx+=43){int wave=int(3*std::sin(time*2.2f+xx*.065f));fill(r,xx,637+wave,23,2,168,204,143,int(cam));}
+  drawAnimatedWater(r,a,635,b-a,SH-635,cam,0,time);
+  // Stone canal edges; the sprite itself starts at the waterline.
+  fill(r,a,615,14,20,70,68,73,int(cam));
+  fill(r,b-14,615,14,20,70,68,73,int(cam));
  }
  // Crocodile: shaded pixel-art silhouette with animated tail, scales and eyes.
  float crocX=3730+145*std::sin(time*.72f), bob=3*std::sin(time*2.8f);
@@ -346,6 +375,7 @@ int main(int,char**){
  initPauseTextures(r);
  initCompleteTextures(r);
  initTerrainTextures(r);
+ initWaterTextures(r);
  auto loadFrame=[&](const FrameData& frame)->SDL_Texture*{
   SDL_Surface* s=SDL_CreateRGBSurfaceWithFormat(0,frame.w,frame.h,32,SDL_PIXELFORMAT_RGBA8888);if(!s)return nullptr;
   SDL_LockSurface(s);Uint32* px=(Uint32*)s->pixels;int pos=0;
@@ -615,5 +645,5 @@ int main(int,char**){
   if(paused)pauseMenu(r,pauseChoice,bgmEnabled);
   SDL_RenderPresent(r);
  }
- if(audio)SDL_CloseAudioDevice(audio);for(auto&t:pauseTextures)if(t)SDL_DestroyTexture(t);for(auto&t:completeTextures)if(t)SDL_DestroyTexture(t);for(auto&t:terrainTextures)if(t)SDL_DestroyTexture(t);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
+ if(audio)SDL_CloseAudioDevice(audio);for(auto&t:pauseTextures)if(t)SDL_DestroyTexture(t);for(auto&t:completeTextures)if(t)SDL_DestroyTexture(t);for(auto&t:terrainTextures)if(t)SDL_DestroyTexture(t);for(auto&t:waterTextures)if(t)SDL_DestroyTexture(t);if(titleTexture)SDL_DestroyTexture(titleTexture);for(auto&t:mom)if(t)SDL_DestroyTexture(t);for(auto&t:anim)SDL_DestroyTexture(t);SDL_DestroyRenderer(r);SDL_DestroyWindow(win);SDL_Quit();return 0;
 }
