@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - visual-pause-menu
 
 jobs:
   build:
